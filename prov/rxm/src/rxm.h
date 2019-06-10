@@ -483,7 +483,6 @@ struct rxm_tx_rndv_buf {
 	uint64_t flags;
 	struct fid_mr *mr[RXM_IOV_LIMIT];
 	uint8_t count;
-	struct rxm_conn *conn;
 
 	/* Must stay at bottom */
 	struct rxm_pkt pkt;
@@ -686,9 +685,6 @@ struct rxm_conn {
 	/* This is saved MSG EP fid, that hasn't been closed during
 	 * handling of CONN_RECV in RXM_CMAP_CONNREQ_SENT for passive side */
 	struct fid_ep *saved_msg_ep;
-
-	/* Limit RNDV sends based on peer rx queue size to avoid increased
-	 * memory usage at peer */
 	uint32_t rndv_tx_credits;
 };
 
