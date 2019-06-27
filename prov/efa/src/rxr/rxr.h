@@ -115,6 +115,11 @@ extern const uint32_t rxr_poison_value;
 #define RXR_MAX_NAME_LENGTH	(32)
 
 /*
+ * Medium sized message cutoff
+ */
+#define RXR_MEDIUM_MSG_THRESHOLD (16000)
+
+/*
  * RxR specific flags that are sent over the wire.
  */
 #define RXR_TAGGED		BIT_ULL(0)
@@ -1067,6 +1072,7 @@ int rxr_ep_post_buf(struct rxr_ep *ep, uint64_t flags);
 ssize_t rxr_ep_send_msg(struct rxr_ep *ep, struct rxr_pkt_entry *pkt_entry,
 			const struct fi_msg *msg, uint64_t flags);
 ssize_t rxr_ep_post_data(struct rxr_ep *rxr_ep, struct rxr_tx_entry *tx_entry);
+ssize_t rxr_ep_post_medium_data(struct rxr_ep *rxr_ep, struct rxr_tx_entry *tx_entry);
 ssize_t rxr_ep_post_read_response(struct rxr_ep *rxr_ep, struct rxr_tx_entry *tx_entry);
 void rxr_ep_init_connack_pkt_entry(struct rxr_ep *ep,
 				   struct rxr_pkt_entry *pkt_entry,
