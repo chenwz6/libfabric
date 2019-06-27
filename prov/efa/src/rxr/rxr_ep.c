@@ -1257,6 +1257,39 @@ ssize_t rxr_ep_post_data(struct rxr_ep *rxr_ep,
 	return ret;
 }
 
+/*
+ * For medium size message, we don't need a RTS/CTS handshake
+ * Just send the data via several rts packets
+ */
+ssize_t rxr_ep_post_medium_data(struct rxr_ep *rxr_ep,
+                         struct rxr_tx_entry *tx_entry)
+{
+    struct rxr_pkt_entry *pkt_entry;
+    ssize_t ret;
+    uint64_t data_sent;
+
+    while(tx_entry->bytes_sent < tx_entry->total_len){
+        pkt_entry = rxr_get_pkt_entry(rxr_ep, rxr_ep->tx_pkt_pool);
+
+        if (OFI_UNLIKELY(!pkt_entry))
+            return -FI_EAGAIN;
+
+        rxr_init_rts_pkt_entry(rxr_ep, tx_entry, pkt_entry);
+
+        ret = rxr_ep_send_pkt(rxr_ep, pkt_entry, tx_entry->addr);
+        if (OFI_UNLIKELY(ret)) {
+            rxr_release_tx_pkt_entry(rxr_ep, pkt_entry);
+            return ret;
+        }
+
+        data_sent = rxr_get_rts_data_size(rxr_ep, rxr_get_rts_hdr(pkt_entry->pkt));
+
+        tx_entry->bytes_sent += data_sent;
+    }
+
+    return 0;
+}
+
 ssize_t rxr_ep_post_read_response(struct rxr_ep *ep, struct rxr_tx_entry *tx_entry)
 {
 	struct rxr_pkt_entry *pkt_entry;
