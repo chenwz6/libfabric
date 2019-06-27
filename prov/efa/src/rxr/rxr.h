@@ -233,6 +233,7 @@ enum rxr_tx_comm_type {
 				  * for rx_entry to finish receiving
 				  * (FI_READ only)
 				  */
+	RXR_TX_QUEUED_MEDIUM_DATA, /* tx_entry was unable to send medium data packets */
 };
 
 enum rxr_rx_comm_type {
