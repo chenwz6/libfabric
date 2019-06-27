@@ -1281,6 +1281,12 @@ static inline int rxr_ep_post_cts_or_queue(struct rxr_ep *ep,
 	return ret;
 }
 
+static inline bool is_medium_size_mssage(struct rxr_tx_entry *tx_entry)
+{
+    return (tx_entry->cq_entry.flags & FI_MSG)
+        && (tx_entry->total_len <= RXR_MEDIUM_MSG_THRESHOLD);
+}
+
 static inline bool rxr_peer_timeout_expired(struct rxr_ep *ep,
 					    struct rxr_peer *peer,
 					    uint64_t ts)
