@@ -1683,22 +1683,25 @@ ssize_t rxr_tx(struct fid_ep *ep, const struct iovec *iov, size_t iov_count,
 	 */
 	if((tx_entry->cq_entry.flags & FI_MSG) && (tx_entry->total_len <= RXR_MEDIUM_MSG_THRESHOLD)){
 	    ret = rxr_ep_post_medium_data(rxr_ep, tx_entry);
-    }else {
+    } else {
         ret = rxr_ep_post_rts(rxr_ep, tx_entry);
-
-        if (OFI_UNLIKELY(ret)) {
-            if (ret == -FI_EAGAIN) {
-                tx_entry->state = RXR_TX_QUEUED_RTS;
-                dlist_insert_tail(&tx_entry->queued_entry,
-                                  &rxr_ep->tx_entry_queued_list);
-                ret = 0;
-            } else {
-                peer = rxr_ep_get_peer(rxr_ep, addr);
-                peer->next_msg_id--;
-            }
-        }
 	}
 
+    if (OFI_UNLIKELY(ret)) {
+        if (ret == -FI_EAGAIN) {
+            if((tx_entry->cq_entry.flags & FI_MSG) && (tx_entry->total_len <= RXR_MEDIUM_MSG_THRESHOLD)) {
+                tx_entry->state = RXR_TX_QUEUED_MEDIUM_DATA;
+            } else {
+                tx_entry->state = RXR_TX_QUEUED_RTS;
+            }
+            dlist_insert_tail(&tx_entry->queued_entry,
+                              &rxr_ep->tx_entry_queued_list);
+            ret = 0;
+        } else {
+            peer = rxr_ep_get_peer(rxr_ep, addr);
+            peer->next_msg_id--;
+        }
+    }
 
 out:
 	fastlock_release(&rxr_ep->util_ep.lock);
