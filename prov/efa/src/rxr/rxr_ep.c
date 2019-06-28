@@ -1283,7 +1283,8 @@ ssize_t rxr_ep_post_medium_msg(struct rxr_ep *rxr_ep,
             return ret;
         }
 
-        data_sent = rxr_get_rts_data_size(rxr_ep, rxr_get_rts_hdr(pkt_entry->pkt));
+        data_sent = MIN(rxr_get_rts_data_size(rxr_ep, rxr_get_rts_hdr(pkt_entry->pkt)),
+                tx_entry->total_len - tx_entry->bytes_sent);
 
         tx_entry->bytes_sent += data_sent;
     }
@@ -1478,7 +1479,7 @@ void rxr_init_rts_pkt_entry(struct rxr_ep *ep,
         data = src;
         data_len = ofi_copy_from_iov(data, payload_size,
                                      tx_entry->iov, tx_entry->iov_count, tx_entry->bytes_sent);
-        assert(data_len == rxr_get_rts_data_size(ep, rts_hdr));
+        assert(data_len == payload_size);
 
         pkt_entry->pkt_size += data_len;
 	} else {
