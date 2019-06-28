@@ -146,6 +146,11 @@ extern const uint32_t rxr_poison_value;
 #define RXR_READ_DATA		(1 << 8)
 
 /*
+ * for medium size message
+ */
+#define RXR_MEDIUM_MSG		(1 << 9)
+
+/*
  * OFI flags
  * The 64-bit flag field is used as follows:
  * 1-grow up    common (usable with multiple operations)
