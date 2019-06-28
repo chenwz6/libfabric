@@ -1357,7 +1357,23 @@ void rxr_cq_handle_pkt_send_completion(struct rxr_ep *ep, struct fi_cq_msg_entry
 		if (!(rts_hdr->flags & RXR_READ_REQ)) {
 			tx_id = rts_hdr->tx_id;
 			tx_entry = ofi_bufpool_get_ibuf(ep->tx_entry_pool, tx_id);
-			tx_entry->bytes_acked += rxr_get_rts_data_size(ep, rts_hdr);
+
+			/* For medium message data packets */
+			if(rts_hdr->flags & RXR_MEDIUM_MSG){
+			    char *src;
+			    uint32_t offset;
+
+			    if(tx_entry->fi_flags & FI_REMOTE_CQ_DATA) {
+                    src = rxr_get_ctrl_cq_pkt(rts_hdr)->data + rts_hdr->addrlen;
+			    } else {
+			        src = rxr_get_ctrl_pkt(rts_hdr)->data + rts_hdr->addrlen;
+			    }
+			    memcpy(&offset, src, sizeof(uint32_t));
+                tx_entry->bytes_acked += MIN(rxr_get_rts_data_size(ep, rts_hdr),
+                        tx_entry->total_len - offset);
+			} else {
+                tx_entry->bytes_acked += rxr_get_rts_data_size(ep, rts_hdr);
+			}
 		}
 		break;
 	case RXR_CONNACK_PKT:
