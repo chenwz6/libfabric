@@ -1466,7 +1466,8 @@ void rxr_init_rts_pkt_entry(struct rxr_ep *ep,
          * Data packets are sent in order so using bytes_sent is okay here.
          */
         rts_hdr->flags |= RXR_MEDIUM_MSG;
-        memcpy(src, tx_entry->bytes_sent, sizeof(uint32_t));
+        /* For medium size messages, offset should not be more than 4 bytes */
+        memcpy(src, &tx_entry->bytes_sent, sizeof(uint32_t));
         src += sizeof(uint32_t);
         pkt_entry->pkt_size += sizeof(uint32_t);
 
