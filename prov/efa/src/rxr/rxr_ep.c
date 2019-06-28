@@ -1681,7 +1681,7 @@ ssize_t rxr_tx(struct fid_ep *ep, const struct iovec *iov, size_t iov_count,
 	 * If this is a regular message with length <= 16K,
 	 * medium data packets will be sent, otherwise post regular rts
 	 */
-	if(is_medium_size_mssage(tx_entry)){
+	if(is_medium_size_message(tx_entry)){
 	    ret = rxr_ep_post_medium_msg(rxr_ep, tx_entry);
     } else {
         ret = rxr_ep_post_rts(rxr_ep, tx_entry);
@@ -1689,7 +1689,7 @@ ssize_t rxr_tx(struct fid_ep *ep, const struct iovec *iov, size_t iov_count,
 
     if (OFI_UNLIKELY(ret)) {
         if (ret == -FI_EAGAIN) {
-            if(is_medium_size_mssage(tx_entry)) {
+            if(is_medium_size_message(tx_entry)) {
                 tx_entry->state = RXR_TX_QUEUED_MEDIUM_MSG;
             } else {
                 tx_entry->state = RXR_TX_QUEUED_RTS;
