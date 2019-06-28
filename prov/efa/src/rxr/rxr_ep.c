@@ -1274,6 +1274,7 @@ ssize_t rxr_ep_post_medium_msg(struct rxr_ep *rxr_ep,
         if (OFI_UNLIKELY(!pkt_entry))
             return -FI_EAGAIN;
 
+        /* We send a medium size message via several rts packets at a time */
         rxr_init_rts_pkt_entry(rxr_ep, tx_entry, pkt_entry);
 
         ret = rxr_ep_send_pkt(rxr_ep, pkt_entry, tx_entry->addr);
@@ -1459,6 +1460,26 @@ void rxr_init_rts_pkt_entry(struct rxr_ep *ep,
 		memcpy(src, &tx_entry->rma_window, sizeof(uint64_t));
 		src += sizeof(uint64_t);
 		pkt_entry->pkt_size += sizeof(uint64_t);
+	} else if(is_medium_size_message(tx_entry)) {
+        /*
+         * If this is a medium data packet, we need to send its offset as well.
+         * Data packets are sent in order so using bytes_sent is okay here.
+         */
+        rts_hdr->flags |= RXR_MEDIUM_MSG;
+        memcpy(src, tx_entry->bytes_sent, sizeof(uint32_t));
+        src += sizeof(uint32_t);
+        pkt_entry->pkt_size += sizeof(uint32_t);
+
+        uint64_t payload_size;
+        payload_size = MIN(tx_entry->total_len - tx_entry->bytes_sent,
+                           mtu - pkt_entry->pkt_size);
+
+        data = src;
+        data_len = ofi_copy_from_iov(data, payload_size,
+                                     tx_entry->iov, tx_entry->iov_count, tx_entry->bytes_sent);
+        assert(data_len == rxr_get_rts_data_size(ep, rts_hdr));
+
+        pkt_entry->pkt_size += data_len;
 	} else {
 		data = src;
 		data_len = ofi_copy_from_iov(data, mtu - pkt_entry->pkt_size,
