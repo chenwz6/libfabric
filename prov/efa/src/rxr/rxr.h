@@ -233,7 +233,8 @@ enum rxr_tx_comm_type {
 				  * for rx_entry to finish receiving
 				  * (FI_READ only)
 				  */
-	RXR_TX_QUEUED_MEDIUM_DATA, /* tx_entry was unable to send medium data packets */
+	RXR_TX_MEDIUM_MSG, /* tx_entry sending medium size message */
+	RXR_TX_QUEUED_MEDIUM_MSG, /* tx_entry was unable to send medium size message */
 };
 
 enum rxr_rx_comm_type {
@@ -1073,7 +1074,7 @@ int rxr_ep_post_buf(struct rxr_ep *ep, uint64_t flags);
 ssize_t rxr_ep_send_msg(struct rxr_ep *ep, struct rxr_pkt_entry *pkt_entry,
 			const struct fi_msg *msg, uint64_t flags);
 ssize_t rxr_ep_post_data(struct rxr_ep *rxr_ep, struct rxr_tx_entry *tx_entry);
-ssize_t rxr_ep_post_medium_data(struct rxr_ep *rxr_ep, struct rxr_tx_entry *tx_entry);
+ssize_t rxr_ep_post_medium_msg(struct rxr_ep *rxr_ep, struct rxr_tx_entry *tx_entry);
 ssize_t rxr_ep_post_read_response(struct rxr_ep *rxr_ep, struct rxr_tx_entry *tx_entry);
 void rxr_ep_init_connack_pkt_entry(struct rxr_ep *ep,
 				   struct rxr_pkt_entry *pkt_entry,

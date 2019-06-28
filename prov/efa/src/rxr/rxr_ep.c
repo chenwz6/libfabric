@@ -1261,7 +1261,7 @@ ssize_t rxr_ep_post_data(struct rxr_ep *rxr_ep,
  * For medium size message, we don't need a RTS/CTS handshake
  * Just send the data via several rts packets
  */
-ssize_t rxr_ep_post_medium_data(struct rxr_ep *rxr_ep,
+ssize_t rxr_ep_post_medium_msg(struct rxr_ep *rxr_ep,
                          struct rxr_tx_entry *tx_entry)
 {
     struct rxr_pkt_entry *pkt_entry;
@@ -1682,7 +1682,7 @@ ssize_t rxr_tx(struct fid_ep *ep, const struct iovec *iov, size_t iov_count,
 	 * medium data packets will be sent, otherwise post regular rts
 	 */
 	if(is_medium_size_mssage(tx_entry)){
-	    ret = rxr_ep_post_medium_data(rxr_ep, tx_entry);
+	    ret = rxr_ep_post_medium_msg(rxr_ep, tx_entry);
     } else {
         ret = rxr_ep_post_rts(rxr_ep, tx_entry);
 	}
@@ -1690,7 +1690,7 @@ ssize_t rxr_tx(struct fid_ep *ep, const struct iovec *iov, size_t iov_count,
     if (OFI_UNLIKELY(ret)) {
         if (ret == -FI_EAGAIN) {
             if(is_medium_size_mssage(tx_entry)) {
-                tx_entry->state = RXR_TX_QUEUED_MEDIUM_DATA;
+                tx_entry->state = RXR_TX_QUEUED_MEDIUM_MSG;
             } else {
                 tx_entry->state = RXR_TX_QUEUED_RTS;
             }
@@ -2670,8 +2670,8 @@ static void rxr_ep_progress_internal(struct rxr_ep *ep)
 				     tx_entry, queued_entry, tmp) {
 		if (tx_entry->state == RXR_TX_QUEUED_RTS)
 			ret = rxr_ep_post_rts(ep, tx_entry);
-		else if (tx_entry->state == RXR_TX_QUEUED_MEDIUM_DATA)
-		    ret = rxr_ep_post_medium_data(ep, tx_entry);
+		else if (tx_entry->state == RXR_TX_QUEUED_MEDIUM_MSG)
+		    ret = rxr_ep_post_medium_msg(ep, tx_entry);
 		else if (tx_entry->state == RXR_TX_QUEUED_READ_RESPONSE)
 			ret = rxr_ep_post_read_response(ep, tx_entry);
 		else
