@@ -1022,6 +1022,9 @@ static inline uint64_t rxr_get_rts_data_size(struct rxr_ep *ep,
 		max_payload_size -= rts_hdr->rma_iov_count *
 					sizeof(struct fi_rma_iov);
 
+	if(rts->flags & RXR_MEDIUM_MSG)
+	    max_payload_size -= sizeof(uint32_t); /* medium data packets carry 4-byte offset */
+
 	return (rts_hdr->data_len > max_payload_size)
 		? max_payload_size : rts_hdr->data_len;
 }
