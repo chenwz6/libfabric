@@ -2690,6 +2690,8 @@ static void rxr_ep_progress_internal(struct rxr_ep *ep)
 		if (tx_entry->state == RXR_TX_QUEUED_RTS ||
 		    tx_entry->state == RXR_TX_QUEUED_RTS_RNR) {
 			tx_entry->state = RXR_TX_RTS;
+		} else if (tx_entry->state == RXR_TX_QUEUED_MEDIUM_MSG) {
+		    tx_entry->state = RXR_TX_MEDIUM_MSG;
 		} else if (tx_entry->state == RXR_TX_QUEUED_READ_RESPONSE) {
 			tx_entry->state = RXR_TX_SENT_READ_RESPONSE;
 		} else if (tx_entry->state == RXR_TX_QUEUED_DATA_RNR) {
