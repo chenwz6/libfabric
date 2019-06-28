@@ -183,12 +183,15 @@ int rxr_cq_handle_tx_error(struct rxr_ep *ep, struct rxr_tx_entry *tx_entry,
 	switch (tx_entry->state) {
 	case RXR_TX_RTS:
 		break;
+	case RXR_TX_MEDIUM_MSG:
+        break;
 	case RXR_TX_SEND:
 		dlist_remove(&tx_entry->entry);
 		break;
 	case RXR_TX_QUEUED_RTS:
 	case RXR_TX_QUEUED_RTS_RNR:
 	case RXR_TX_QUEUED_DATA_RNR:
+    case RXR_TX_QUEUED_MEDIUM_MSG:
 		dlist_remove(&tx_entry->queued_entry);
 		break;
 	default:
