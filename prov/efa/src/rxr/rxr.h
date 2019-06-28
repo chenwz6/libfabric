@@ -293,19 +293,6 @@ struct rxr_av {
 	size_t rdm_addrlen;
 };
 
-struct rxr_peer {
-	struct rxr_robuf *robuf;	/* tracks expected msg_id on rx */
-	uint32_t next_msg_id;		/* sender's view of msg_id */
-	enum rxr_peer_state state;	/* state of CM protocol with peer */
-	unsigned int rnr_state;		/* tracks RNR backoff for peer */
-	uint64_t rnr_ts;		/* timestamp for RNR backoff tracking */
-	int rnr_queued_pkt_cnt;		/* queued RNR packet count */
-	int timeout_interval;		/* initial RNR timeout value */
-	int rnr_timeout_exp;		/* RNR timeout exponentation calc val */
-	struct dlist_entry rnr_entry;	/* linked to rxr_ep peer_backoff_list */
-	struct dlist_entry entry;	/* linked to rxr_ep peer_list */
-};
-
 struct rxr_rx_entry {
 	/* Must remain at the top */
 	enum rxr_x_entry_type type;
@@ -429,6 +416,27 @@ struct rxr_tx_entry {
 	/* linked with tx_entry_list in rxr_ep */
 	struct dlist_entry tx_entry_entry;
 #endif
+};
+
+/* A hashtable mapping msg_id to rx_entry for medium size messages */
+struct rxr_msg_id_to_rx_entry {
+    uint32_t msg_id;    /* key */
+    struct rxr_rx_entry rx_entry;    /* value */
+    UT_hash_handle hh;    /* makes this structure hashable */
+};
+
+struct rxr_peer {
+    struct rxr_robuf *robuf;	/* tracks expected msg_id on rx */
+    uint32_t next_msg_id;		/* sender's view of msg_id */
+    enum rxr_peer_state state;	/* state of CM protocol with peer */
+    unsigned int rnr_state;		/* tracks RNR backoff for peer */
+    uint64_t rnr_ts;		/* timestamp for RNR backoff tracking */
+    int rnr_queued_pkt_cnt;		/* queued RNR packet count */
+    int timeout_interval;		/* initial RNR timeout value */
+    int rnr_timeout_exp;		/* RNR timeout exponentation calc val */
+    struct dlist_entry rnr_entry;	/* linked to rxr_ep peer_backoff_list */
+    struct dlist_entry entry;	/* linked to rxr_ep peer_list */
+    struct rxr_msg_id_to_rx_entry *rx_entry_map;    /* mapping msg_id to rx_entry */
 };
 
 #define RXR_GET_X_ENTRY_TYPE(pkt_entry)	\
