@@ -2670,6 +2670,8 @@ static void rxr_ep_progress_internal(struct rxr_ep *ep)
 				     tx_entry, queued_entry, tmp) {
 		if (tx_entry->state == RXR_TX_QUEUED_RTS)
 			ret = rxr_ep_post_rts(ep, tx_entry);
+		else if (tx_entry->state == RXR_TX_QUEUED_MEDIUM_DATA)
+		    ret = rxr_ep_post_medium_data(ep, tx_entry);
 		else if (tx_entry->state == RXR_TX_QUEUED_READ_RESPONSE)
 			ret = rxr_ep_post_read_response(ep, tx_entry);
 		else
