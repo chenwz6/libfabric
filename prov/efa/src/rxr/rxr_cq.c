@@ -783,6 +783,13 @@ void rxr_cq_recv_rts_data(struct rxr_ep *ep,
 	}
 }
 
+int rxr_cq_recv_medium_data(struct rxr_ep *ep,
+                            struct rxr_rx_entry *rx_entry,
+                            struct rxr_rts_hdr *rts_hdr)
+{
+
+}
+
 static int rxr_cq_process_rts(struct rxr_ep *ep,
 			      struct rxr_pkt_entry *pkt_entry)
 {
@@ -872,6 +879,12 @@ static int rxr_cq_process_rts(struct rxr_ep *ep,
 	 * TODO: Change protocol to contact sender to stop sending when the
 	 * message is truncated instead of sinking the additional data.
 	 */
+
+	/* Receiving medium size messages */
+	if(rts_hdr->flags & RXR_MEDIUM_MSG) {
+	    ret = rxr_cq_recv_medium_data(ep, rx_entry, rts_hdr);
+	    return ret;
+	}
 
 	rxr_cq_recv_rts_data(ep, rx_entry, rts_hdr);
 
