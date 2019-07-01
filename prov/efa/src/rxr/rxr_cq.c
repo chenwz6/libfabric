@@ -797,6 +797,8 @@ static int rxr_cq_process_rts(struct rxr_ep *ep,
 
 	rts_hdr = rxr_get_rts_hdr(pkt_entry->pkt);
 
+	/* TODO: For a medium size message, check the hashtable first*/
+
 	if (rts_hdr->flags & RXR_TAGGED) {
 		match = dlist_find_first_match(&ep->rx_tagged_list,
 					       &rxr_cq_match_trecv,
@@ -859,6 +861,9 @@ static int rxr_cq_process_rts(struct rxr_ep *ep,
 	rx_entry->msg_id = rts_hdr->msg_id;
 	rx_entry->total_len = rts_hdr->data_len;
 	rx_entry->cq_entry.tag = rts_hdr->tag;
+	/*
+	 * TODO: mapping msg_id to rx_entry for a medium size message
+	 */
 
 	if (OFI_UNLIKELY(!match))
 		return 0;
@@ -954,8 +959,12 @@ static int rxr_cq_reorder_msg(struct rxr_ep *ep,
 #endif
 	if (ofi_recvwin_is_exp(peer->robuf, rts_hdr->msg_id))
 		return 0;
-	else if (ofi_recvwin_is_delayed(peer->robuf, rts_hdr->msg_id))
-		return -FI_EALREADY;
+	else if (ofi_recvwin_is_delayed(peer->robuf, rts_hdr->msg_id)) {
+        /* TODO: If this is a medium size message, it should not be a delayed rts
+         *
+         */
+	    return -FI_EALREADY;
+	}
 
 	if (OFI_LIKELY(rxr_env.rx_copy_ooo)) {
 		assert(pkt_entry->type == RXR_PKT_ENTRY_POSTED);
@@ -972,7 +981,7 @@ static int rxr_cq_reorder_msg(struct rxr_ep *ep,
 	} else {
 		ooo_entry = pkt_entry;
 	}
-
+    /* TODO: Get the pkt_entry by msg_id, if it is a duplicate one, link it to the tail of pkt_entry */
 	ofi_recvwin_queue_msg(peer->robuf, &ooo_entry, rts_hdr->msg_id);
 	return 1;
 }
