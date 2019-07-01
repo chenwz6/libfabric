@@ -736,6 +736,7 @@ struct rxr_pkt_entry {
 	struct fid_mr *mr;
 	fi_addr_t addr;
 	void *pkt; /* rxr_ctrl_*_pkt, or rxr_data_pkt */
+	struct rxr_pkt_entry *next; /* link multiple rts packets for medium size messages */
 	enum rxr_pkt_entry_type type;
 	enum rxr_pkt_entry_state state;
 #if ENABLE_DEBUG
