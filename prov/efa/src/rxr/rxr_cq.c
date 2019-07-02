@@ -833,7 +833,7 @@ int rxr_cq_recv_medium_data(struct rxr_ep *ep,
             ret = rxr_cq_handle_rx_completion(ep, NULL,
                                               pkt_entry, rx_entry);
 
-            rxr_multi_recv_free_posted_entry(ep, rx_entry);
+//            rxr_multi_recv_free_posted_entry(ep, rx_entry);
             if (OFI_LIKELY(!ret))
                 rxr_release_rx_entry(ep, rx_entry);
             return ret;
