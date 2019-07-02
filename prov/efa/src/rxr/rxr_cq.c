@@ -856,6 +856,7 @@ static int rxr_cq_process_rts(struct rxr_ep *ep,
 	struct dlist_entry *match;
 	struct rxr_rx_entry *rx_entry;
 	struct rxr_tx_entry *tx_entry;
+    struct rxr_map_to_rx_entry key_entry, *map_entry;
 	uint64_t bytes_left;
 	uint64_t tag = 0;
 	uint32_t op;
@@ -863,7 +864,27 @@ static int rxr_cq_process_rts(struct rxr_ep *ep,
 
 	rts_hdr = rxr_get_rts_hdr(pkt_entry->pkt);
 
-	/* TODO: For a medium size message, check the hashtable first*/
+	/*
+	 * For a medium size message, check the hashtable first
+	 */
+	if(rts_hdr->flags & RXR_MEDIUM_MSG) {
+        memset(&key_entry, 0, sizeof(key_entry));
+        key_entry.key.msg_id = rts_hdr->msg_id;
+        key_entry.key.addr = pkt_entry->addr;
+        HASH_FIND(hh, ep->rx_entry_map, &key_entry.key, sizeof(key_entry.key), map_entry);
+	    if(map_entry) {
+	        /* If rx_entry exists, then we need to check its comm state */
+	        rx_entry = map_entry->rx_entry;
+	        if(rx_entry->state == RXR_RX_RECV) {
+                ret = rxr_cq_recv_medium_data(ep, rx_entry, pkt_entry);
+	        } else {
+	            /* Otherwise, it must be an unexpected rx_entry and we need to queue it */
+	            rx_entry->unexp_rts_pkt->next = pkt_entry;
+	        }
+            free(key_entry);
+	        return ret;
+	    }
+	}
 
 	if (rts_hdr->flags & RXR_TAGGED) {
 		match = dlist_find_first_match(&ep->rx_tagged_list,
@@ -927,9 +948,18 @@ static int rxr_cq_process_rts(struct rxr_ep *ep,
 	rx_entry->msg_id = rts_hdr->msg_id;
 	rx_entry->total_len = rts_hdr->data_len;
 	rx_entry->cq_entry.tag = rts_hdr->tag;
+
 	/*
-	 * TODO: mapping msg_id to rx_entry for a medium size message
+	 * put the rx_entry into the hashtable for a medium size message
 	 */
+	if(rts_hdr->flags & RXR_MEDIUM_MSG) {
+        map_entry = (struct rxr_map_to_rx_entry *)malloc(sizeof(*map_entry));
+        memset(map_entry, 0, sizeof(*map_entry));
+        map_entry->key.msg_id = rts_hdr->msg_id;
+        map_entry->key.addr = pkt_entry->addr;
+        map_entry->rx_entry = rx_entry;
+        HASH_ADD(hh, ep->rx_entry_map, key, sizeof(map_entry->key), map_entry);
+	}
 
 	if (OFI_UNLIKELY(!match))
 		return 0;
