@@ -472,6 +472,9 @@ struct rxr_ep {
 	/* free stack for reorder buffer */
 	struct rxr_robuf_fs *robuf_fs;
 
+	/* hashtable for medium size messages */
+    struct rxr_map_to_rx_entry *rx_entry_map;
+
 	/* core provider fid */
 	struct fid_ep *rdm_ep;
 	struct fid_cq *rdm_cq;
