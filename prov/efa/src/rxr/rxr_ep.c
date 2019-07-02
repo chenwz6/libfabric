@@ -2823,6 +2823,9 @@ int rxr_endpoint(struct fid_domain *domain, struct fi_info *info,
 	rxr_ep->core_iov_limit = rdm_info->tx_attr->iov_limit;
 	rxr_ep->core_caps = rdm_info->caps;
 
+    /* /Initialize rx_entry_map to NULL */
+    rxr_ep->rx_entry_map = NULL;
+
 	cq_attr.size = MAX(rxr_ep->rx_size + rxr_ep->tx_size,
 			   rxr_env.cq_size);
 
