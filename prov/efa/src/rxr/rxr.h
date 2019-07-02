@@ -421,7 +421,7 @@ struct rxr_tx_entry {
 /* A hashtable mapping msg_id to rx_entry for medium size messages */
 struct rxr_msg_id_to_rx_entry {
     uint32_t msg_id;    /* key */
-    struct rxr_rx_entry rx_entry;    /* value */
+    struct rxr_rx_entry *rx_entry;    /* value */
     UT_hash_handle hh;    /* makes this structure hashable */
 };
 
