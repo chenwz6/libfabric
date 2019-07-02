@@ -784,10 +784,69 @@ void rxr_cq_recv_rts_data(struct rxr_ep *ep,
 }
 
 int rxr_cq_recv_medium_data(struct rxr_ep *ep,
-                            struct rxr_rx_entry *rx_entry,
-                            struct rxr_rts_hdr *rts_hdr)
+			      struct rxr_rx_entry *rx_entry,
+			      struct rxr_pkt_entry *pkt_entry)
 {
+    int ret = 0;
 
+    rx_entry->cq_entry.len = MIN(rx_entry->total_len,
+                                 rx_entry->cq_entry.len);
+
+    /* TODO: maybe need a new state for rx_entry */
+
+    /* There maybe multiple rts packets for a medium size message because of queuing */
+    while(pkt_entry != NULL) {
+
+        struct rxr_rts_hdr *rts_hdr;
+        struct rxr_pkt_entry *prev_pkt_entry; /* previous packet entry */
+        char *src, *data;
+        uint32_t offset;
+        uint64_t data_len;
+
+        rts_hdr = rxr_get_rts_hdr(pkt_entry->pkt);
+
+        if (rts_hdr->flags & RXR_REMOTE_CQ_DATA) {
+            rx_entry->cq_entry.flags |= FI_REMOTE_CQ_DATA;
+            src = rxr_get_ctrl_cq_pkt(rts_hdr)->data + rts_hdr->addrlen;
+            rx_entry->cq_entry.data =
+                    rxr_get_ctrl_cq_pkt(rts_hdr)->hdr.cq_data;
+        } else {
+            rx_entry->cq_entry.data = 0;
+            src = rxr_get_ctrl_pkt(rts_hdr)->data + rts_hdr->addrlen;
+        }
+
+        /* Get the data offset */
+        memcpy(&offset, src, sizeof(uint32_t));
+        src += sizeof(uint32_t);
+
+        data = src;
+        data_len = MIN(rxr_get_rts_data_size(ep, rts_hdr), rx_entry->total_len - offset);
+
+        /* we are sinking message for CANCEL/DISCARD entry */
+        if(OFI_LIKELY(!(rx_entry->rxr_flags & RXR_RECV_CANCEL))) {
+            ofi_copy_to_iov(rx_entry->iov, rx_entry->iov_count,
+                                                    offset, data, data_len);
+        }
+        rx_entry->bytes_done += data_len;
+
+        if (rx_entry->total_len == rx_entry->bytes_done) {
+            ret = rxr_cq_handle_rx_completion(ep, NULL,
+                                              pkt_entry, rx_entry);
+
+            rxr_multi_recv_free_posted_entry(ep, rx_entry);
+            if (OFI_LIKELY(!ret))
+                rxr_release_rx_entry(ep, rx_entry);
+            return ret;
+        }
+
+        prev_pkt_entry = pkt_entry;
+        pkt_entry = pkt_entry->next;
+        if (prev_pkt_entry->type == RXR_PKT_ENTRY_POSTED)
+            ep->rx_bufs_to_post++;
+        rxr_release_rx_pkt_entry(ep, prev_pkt_entry);
+    }
+
+    return ret;
 }
 
 static int rxr_cq_process_rts(struct rxr_ep *ep,
@@ -882,7 +941,7 @@ static int rxr_cq_process_rts(struct rxr_ep *ep,
 
 	/* Receiving medium size messages */
 	if(rts_hdr->flags & RXR_MEDIUM_MSG) {
-	    ret = rxr_cq_recv_medium_data(ep, rx_entry, rts_hdr);
+	    ret = rxr_cq_recv_medium_data(ep, rx_entry, pkt_entry);
 	    return ret;
 	}
 
