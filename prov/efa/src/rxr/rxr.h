@@ -418,9 +418,15 @@ struct rxr_tx_entry {
 #endif
 };
 
-/* A hashtable mapping msg_id to rx_entry for medium size messages */
-struct rxr_msg_id_to_rx_entry {
-    uint32_t msg_id;    /* key */
+/* hashtable key structure for medium size messages */
+struct key_to_rx_entry {
+    uint32_t msg_id;
+    fi_addr_t addr;
+};
+
+/* hashtable entry for medium size messages */
+struct rxr_map_to_rx_entry {
+    struct key_to_rx_entry key;    /* key */
     struct rxr_rx_entry *rx_entry;    /* value */
     UT_hash_handle hh;    /* makes this structure hashable */
 };
@@ -436,7 +442,6 @@ struct rxr_peer {
     int rnr_timeout_exp;		/* RNR timeout exponentation calc val */
     struct dlist_entry rnr_entry;	/* linked to rxr_ep peer_backoff_list */
     struct dlist_entry entry;	/* linked to rxr_ep peer_list */
-    struct rxr_msg_id_to_rx_entry *rx_entry_map;    /* mapping msg_id to rx_entry */
 };
 
 #define RXR_GET_X_ENTRY_TYPE(pkt_entry)	\
