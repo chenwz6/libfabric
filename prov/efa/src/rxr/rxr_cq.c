@@ -789,13 +789,8 @@ int rxr_cq_recv_medium_data(struct rxr_ep *ep,
 {
     int ret = 0;
 
-    rx_entry->cq_entry.len = MIN(rx_entry->total_len,
-                                 rx_entry->cq_entry.len);
-
-    /* TODO: maybe need a new state for rx_entry */
-
     /* There maybe multiple rts packets for a medium size message because of queuing */
-    while(pkt_entry != NULL) {
+    while(pkt_entry) {
 
         struct rxr_rts_hdr *rts_hdr;
         struct rxr_pkt_entry *prev_pkt_entry; /* previous packet entry */
@@ -830,9 +825,10 @@ int rxr_cq_recv_medium_data(struct rxr_ep *ep,
         rx_entry->bytes_done += data_len;
 
         if (rx_entry->total_len == rx_entry->bytes_done) {
+            rx_entry->cq_entry.len = MIN(rx_entry->total_len,
+                                         rx_entry->cq_entry.len);
             ret = rxr_cq_handle_rx_completion(ep, NULL,
                                               pkt_entry, rx_entry);
-
 //            rxr_multi_recv_free_posted_entry(ep, rx_entry);
             if (OFI_LIKELY(!ret))
                 rxr_release_rx_entry(ep, rx_entry);
