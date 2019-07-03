@@ -946,7 +946,7 @@ static int rxr_cq_process_rts(struct rxr_ep *ep,
         rx_entry->cq_entry.len = MIN(rx_entry->total_len,
                                      rx_entry->cq_entry.len);
 	    rxr_cq_recv_medium_data(ep, rx_entry, pkt_entry);
-	    return ret;
+	    return 0;
 	}
 
 	rxr_cq_recv_rts_data(ep, rx_entry, rts_hdr);
