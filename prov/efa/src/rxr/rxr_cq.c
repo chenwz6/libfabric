@@ -1012,6 +1012,7 @@ static int rxr_cq_reorder_msg(struct rxr_ep *ep,
 {
 	struct rxr_rts_hdr *rts_hdr;
 	struct rxr_pkt_entry *ooo_entry;
+	struct rxr_pkt_entry *cur_ooo_entry; /* Use to check duplicate for medium size messages */
 
 	rts_hdr = rxr_get_rts_hdr(pkt_entry->pkt);
 
@@ -1054,8 +1055,17 @@ static int rxr_cq_reorder_msg(struct rxr_ep *ep,
 	} else {
 		ooo_entry = pkt_entry;
 	}
-    /* TODO: Get the pkt_entry by msg_id, if it is a duplicate one, link it to the tail of pkt_entry */
-	ofi_recvwin_queue_msg(peer->robuf, &ooo_entry, rts_hdr->msg_id);
+
+    /* Check the queue first by msg_id, if it is a duplicate one, link it to the tail of pkt_entry */
+    cur_ooo_entry = *ofi_recvwin_get_msg(peer->robuf, rts_hdr->msg_id);
+    if(cur_ooo_entry) {
+        while(cur_ooo_entry->next) {
+            cur_ooo_entry = cur_ooo_entry->next;
+        }
+        cur_ooo_entry->next = ooo_entry;
+    } else {
+        ofi_recvwin_queue_msg(peer->robuf, &ooo_entry, rts_hdr->msg_id);
+    }
 	return 1;
 }
 
