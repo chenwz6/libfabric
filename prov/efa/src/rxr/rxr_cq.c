@@ -1098,6 +1098,7 @@ static void rxr_cq_handle_rts(struct rxr_ep *ep,
 	struct rxr_rts_hdr *rts_hdr;
 	struct rxr_av *av;
 	struct rxr_peer *peer;
+    struct rxr_rx_entry *rx_entry;
     struct rxr_map_to_rx_entry key_entry, *map_entry;
 	void *raw_address;
 	int i, ret;
@@ -1120,6 +1121,7 @@ static void rxr_cq_handle_rts(struct rxr_ep *ep,
                 rxr_cq_recv_medium_data(ep, rx_entry, pkt_entry);
             } else {
                 /* Otherwise, it must be an unexpected rx_entry and we need to queue it */
+                
                 rx_entry->unexp_rts_pkt->next = pkt_entry;
             }
             return;
