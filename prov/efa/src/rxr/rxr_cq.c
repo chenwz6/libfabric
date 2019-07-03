@@ -940,7 +940,7 @@ static int rxr_cq_process_rts(struct rxr_ep *ep,
 	 * message is truncated instead of sinking the additional data.
 	 */
 
-	/* Receiving medium size messages */
+	/* For receiving medium size messages */
 	if(rts_hdr->flags & RXR_MEDIUM_MSG) {
         rx_entry->state = RXR_RX_RECV;
         rx_entry->cq_entry.len = MIN(rx_entry->total_len,
