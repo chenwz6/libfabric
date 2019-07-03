@@ -825,8 +825,6 @@ void rxr_cq_recv_medium_data(struct rxr_ep *ep,
         rx_entry->bytes_done += data_len;
 
         if (rx_entry->total_len == rx_entry->bytes_done) {
-            rx_entry->cq_entry.len = MIN(rx_entry->total_len,
-                                         rx_entry->cq_entry.len);
             ret = rxr_cq_handle_rx_completion(ep, NULL,
                                               pkt_entry, rx_entry);
 //            rxr_multi_recv_free_posted_entry(ep, rx_entry);
@@ -945,6 +943,8 @@ static int rxr_cq_process_rts(struct rxr_ep *ep,
 	/* Receiving medium size messages */
 	if(rts_hdr->flags & RXR_MEDIUM_MSG) {
         rx_entry->state = RXR_RX_RECV;
+        rx_entry->cq_entry.len = MIN(rx_entry->total_len,
+                                     rx_entry->cq_entry.len);
 	    ret = rxr_cq_recv_medium_data(ep, rx_entry, pkt_entry);
 	    return ret;
 	}
