@@ -783,11 +783,11 @@ void rxr_cq_recv_rts_data(struct rxr_ep *ep,
 	}
 }
 
-int rxr_cq_recv_medium_data(struct rxr_ep *ep,
+void rxr_cq_recv_medium_data(struct rxr_ep *ep,
 			      struct rxr_rx_entry *rx_entry,
 			      struct rxr_pkt_entry *pkt_entry)
 {
-    int ret = 0;
+    int ret;
 
     /* There maybe multiple rts packets for a medium size message because of queuing */
     while(pkt_entry) {
@@ -832,7 +832,7 @@ int rxr_cq_recv_medium_data(struct rxr_ep *ep,
 //            rxr_multi_recv_free_posted_entry(ep, rx_entry);
             if (OFI_LIKELY(!ret))
                 rxr_release_rx_entry(ep, rx_entry);
-            return ret;
+            return;
         }
 
         prev_pkt_entry = pkt_entry;
@@ -842,7 +842,7 @@ int rxr_cq_recv_medium_data(struct rxr_ep *ep,
         rxr_release_rx_pkt_entry(ep, prev_pkt_entry);
     }
 
-    return ret;
+    return;
 }
 
 static int rxr_cq_process_rts(struct rxr_ep *ep,
@@ -852,35 +852,12 @@ static int rxr_cq_process_rts(struct rxr_ep *ep,
 	struct dlist_entry *match;
 	struct rxr_rx_entry *rx_entry;
 	struct rxr_tx_entry *tx_entry;
-    struct rxr_map_to_rx_entry key_entry, *map_entry;
 	uint64_t bytes_left;
 	uint64_t tag = 0;
 	uint32_t op;
 	int ret = 0;
 
 	rts_hdr = rxr_get_rts_hdr(pkt_entry->pkt);
-
-	/*
-	 * For a medium size message, check the hashtable first
-	 */
-	if(rts_hdr->flags & RXR_MEDIUM_MSG) {
-        memset(&key_entry, 0, sizeof(key_entry));
-        key_entry.key.msg_id = rts_hdr->msg_id;
-        key_entry.key.addr = pkt_entry->addr;
-        HASH_FIND(hh, ep->rx_entry_map, &key_entry.key, sizeof(key_entry.key), map_entry);
-	    if(map_entry) {
-	        /* If rx_entry exists, then we need to check its comm state */
-	        rx_entry = map_entry->rx_entry;
-	        if(rx_entry->state == RXR_RX_RECV) {
-                ret = rxr_cq_recv_medium_data(ep, rx_entry, pkt_entry);
-	        } else {
-	            /* Otherwise, it must be an unexpected rx_entry and we need to queue it */
-	            rx_entry->unexp_rts_pkt->next = pkt_entry;
-	        }
-            free(key_entry);
-	        return ret;
-	    }
-	}
 
 	if (rts_hdr->flags & RXR_TAGGED) {
 		match = dlist_find_first_match(&ep->rx_tagged_list,
@@ -1059,9 +1036,6 @@ static int rxr_cq_reorder_msg(struct rxr_ep *ep,
 	if (ofi_recvwin_is_exp(peer->robuf, rts_hdr->msg_id))
 		return 0;
 	else if (ofi_recvwin_is_delayed(peer->robuf, rts_hdr->msg_id)) {
-        /* TODO: If this is a medium size message, it should not be a delayed rts
-         *
-         */
 	    return -FI_EALREADY;
 	}
 
@@ -1124,11 +1098,33 @@ static void rxr_cq_handle_rts(struct rxr_ep *ep,
 	struct rxr_rts_hdr *rts_hdr;
 	struct rxr_av *av;
 	struct rxr_peer *peer;
+    struct rxr_map_to_rx_entry key_entry, *map_entry;
 	void *raw_address;
 	int i, ret;
 
 	rts_hdr = rxr_get_rts_hdr(pkt_entry->pkt);
 	av = rxr_ep_av(ep);
+
+    /*
+     * For a medium size message, check the hashtable first
+     */
+    if(rts_hdr->flags & RXR_MEDIUM_MSG) {
+        memset(&key_entry, 0, sizeof(key_entry));
+        key_entry.key.msg_id = rts_hdr->msg_id;
+        key_entry.key.addr = pkt_entry->addr;
+        HASH_FIND(hh, ep->rx_entry_map, &key_entry.key, sizeof(key_entry.key), map_entry);
+        if(map_entry) {
+            /* If rx_entry exists, then we need to check its comm state */
+            rx_entry = map_entry->rx_entry;
+            if(rx_entry->state == RXR_RX_RECV) {
+                rxr_cq_recv_medium_data(ep, rx_entry, pkt_entry);
+            } else {
+                /* Otherwise, it must be an unexpected rx_entry and we need to queue it */
+                rx_entry->unexp_rts_pkt->next = pkt_entry;
+            }
+            return;
+        }
+    }
 
 	if (OFI_UNLIKELY(src_addr == FI_ADDR_NOTAVAIL)) {
 		assert(rts_hdr->flags & RXR_REMOTE_SRC_ADDR);

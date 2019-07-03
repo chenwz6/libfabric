@@ -1150,7 +1150,7 @@ void rxr_cq_recv_rts_data(struct rxr_ep *ep,
 			  struct rxr_rx_entry *rx_entry,
 			  struct rxr_rts_hdr *rts_hdr);
 
-int rxr_cq_recv_medium_data(struct rxr_ep *ep,
+void rxr_cq_recv_medium_data(struct rxr_ep *ep,
               struct rxr_rx_entry *rx_entry,
               struct rxr_pkt_entry *pkt_entry);
 
