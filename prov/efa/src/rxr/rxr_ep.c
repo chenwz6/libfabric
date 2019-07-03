@@ -476,6 +476,13 @@ static int rxr_ep_handle_unexp_match(struct rxr_ep *ep,
 		rx_entry->ignore = ~0;
 	}
 
+    /* For receiving medium size messages */
+	if(rts_hdr->flags & RXR_MEDIUM_MSG) {
+	    rx_entry->state = RXR_RX_RECV;
+	    rxr_cq_recv_medium_data(ep, rx_entry, pkt_entry);
+	    return 0;
+	}
+
 	rxr_cq_recv_rts_data(ep, rx_entry, rts_hdr);
 
 	/*
