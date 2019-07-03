@@ -83,6 +83,8 @@ int rxr_cq_handle_rx_error(struct rxr_ep *ep, struct rxr_rx_entry *rx_entry,
 	struct util_cq *util_cq;
 	struct dlist_entry *tmp;
 	struct rxr_pkt_entry *pkt_entry;
+    struct rxr_pkt_entry *unexp_pkt_entry;
+    struct rxr_pkt_entry *prev_unexp_pkt_entry;
 
 	memset(&err_entry, 0, sizeof(err_entry));
 
@@ -118,12 +120,17 @@ int rxr_cq_handle_rx_error(struct rxr_ep *ep, struct rxr_rx_entry *rx_entry,
 				     pkt_entry, entry, tmp)
 		rxr_release_tx_pkt_entry(ep, pkt_entry);
 
-	if (rx_entry->unexp_rts_pkt) {
-		if (rx_entry->unexp_rts_pkt->type == RXR_PKT_ENTRY_POSTED)
+	/* There may be multiple unexpected packets now for medium size messages */
+	unexp_pkt_entry = rx_entry->unexp_rts_pkt;
+	while (unexp_pkt_entry) {
+		if (unexp_pkt_entry->type == RXR_PKT_ENTRY_POSTED)
 			ep->rx_bufs_to_post++;
-		rxr_release_rx_pkt_entry(ep, rx_entry->unexp_rts_pkt);
-		rx_entry->unexp_rts_pkt = NULL;
+
+		prev_unexp_pkt_entry = unexp_pkt_entry;
+		unexp_pkt_entry = unexp_pkt_entry->next;
+		rxr_release_rx_pkt_entry(ep, prev_unexp_pkt_entry);
 	}
+    rx_entry->unexp_rts_pkt = NULL;
 
 	if (rx_entry->fi_flags & FI_MULTI_RECV)
 		rxr_cq_handle_multi_recv_completion(ep, rx_entry);
