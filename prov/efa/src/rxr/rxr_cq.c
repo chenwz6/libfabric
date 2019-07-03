@@ -1110,7 +1110,7 @@ static void rxr_cq_handle_rts(struct rxr_ep *ep,
 	struct rxr_peer *peer;
     struct rxr_rx_entry *rx_entry;
     struct rxr_pkt_entry *cur_unexp_rts_pkt; /* used to traversing multiple unexpected rts packets */
-    struct rxr_map_to_rx_entry key_entry, *map_entry;
+    struct rxr_map_to_rx_entry key_entry, *map_entry; /* for rx_entry map */
 	void *raw_address;
 	int i, ret;
 
