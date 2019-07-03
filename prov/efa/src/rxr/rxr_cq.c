@@ -1117,9 +1117,7 @@ static void rxr_cq_handle_rts(struct rxr_ep *ep,
 	rts_hdr = rxr_get_rts_hdr(pkt_entry->pkt);
 	av = rxr_ep_av(ep);
 
-    /*
-     * For a medium size message, check the hashtable first
-     */
+    /* For a medium size message, check the hashtable first */
     if(rts_hdr->flags & RXR_MEDIUM_MSG) {
         memset(&key_entry, 0, sizeof(key_entry));
         key_entry.key.msg_id = rts_hdr->msg_id;
