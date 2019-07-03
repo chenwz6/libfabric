@@ -944,8 +944,8 @@ static int rxr_cq_process_rts(struct rxr_ep *ep,
 
 	/* Receiving medium size messages */
 	if(rts_hdr->flags & RXR_MEDIUM_MSG) {
+        rx_entry->state = RXR_RX_RECV;
 	    ret = rxr_cq_recv_medium_data(ep, rx_entry, pkt_entry);
-	    rx_entry->state = RXR_RX_RECV;
 	    return ret;
 	}
 
