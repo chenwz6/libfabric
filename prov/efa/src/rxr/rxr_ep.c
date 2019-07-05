@@ -2724,6 +2724,13 @@ static void rxr_ep_progress_internal(struct rxr_ep *ep)
 		    tx_entry->state = RXR_TX_MEDIUM_MSG;
 		} else if (tx_entry->state == RXR_TX_QUEUED_READ_RESPONSE) {
 			tx_entry->state = RXR_TX_SENT_READ_RESPONSE;
+		} else if(tx_entry->state == RXR_TX_QUEUED_MEDIUM_DATA_RNR) {
+		    /* We can not set it to RXR_TX_MEDIUM_MSG here
+		     * because if it is a queued medium message before, we still have some data packets to send
+		     */
+		    tx_entry->state = RXR_TX_QUEUED_MEDIUM_MSG;
+            dlist_insert_tail(&tx_entry->queued_entry,
+                              &ep->tx_entry_queued_list);
 		} else if (tx_entry->state == RXR_TX_QUEUED_DATA_RNR) {
 			tx_entry->state = RXR_TX_SEND;
 			dlist_insert_tail(&tx_entry->entry,
