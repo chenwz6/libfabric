@@ -416,9 +416,9 @@ int rxr_cq_handle_cq_error(struct rxr_ep *ep, ssize_t err)
 			dlist_insert_tail(&tx_entry->queued_entry,
 					  &ep->tx_entry_queued_list);
 		} else if (tx_entry->state == RXR_TX_QUEUED_MEDIUM_MSG) {
-            tx_entry->state = RXR_TX_QUEUED_MEDIUM_DATA_RNR;
-		} else if (tx_entry->state == RXR_MEDIUM_MSG) {
-            tx_entry->state = RXR_TX_QUEUED_MEDIUM_DATA_RNR;
+            tx_entry->state = RXR_TX_QUEUED_MEDIUM_MSG_RNR;
+		} else if (tx_entry->state == RXR_TX_MEDIUM_MSG) {
+            tx_entry->state = RXR_TX_QUEUED_MEDIUM_MSG_RNR;
             dlist_insert_tail(&tx_entry->queued_entry,
                               &ep->tx_entry_queued_list);
 		} else if (tx_entry->state == RXR_TX_RTS) {

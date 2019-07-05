@@ -240,7 +240,7 @@ enum rxr_tx_comm_type {
 				  */
 	RXR_TX_MEDIUM_MSG, /* tx_entry sending medium size message */
 	RXR_TX_QUEUED_MEDIUM_MSG, /* tx_entry was unable to send medium size message */
-    RXR_TX_QUEUED_MEDIUM_DATA_RNR /* tx_entry RNR sending medium data packets */
+    RXR_TX_QUEUED_MEDIUM_MSG_RNR /* tx_entry RNR sending medium data packets */
 };
 
 enum rxr_rx_comm_type {
