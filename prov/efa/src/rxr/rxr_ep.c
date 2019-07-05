@@ -1721,11 +1721,8 @@ ssize_t rxr_tx(struct fid_ep *ep, const struct iovec *iov, size_t iov_count,
 
     if (OFI_UNLIKELY(ret)) {
         if (ret == -FI_EAGAIN) {
-            if(is_medium_size_message(tx_entry)) {
-                tx_entry->state = RXR_TX_QUEUED_MEDIUM_MSG;
-            } else {
-                tx_entry->state = RXR_TX_QUEUED_RTS;
-            }
+            tx_entry->state = is_medium_size_message(tx_entry) ?
+                    RXR_TX_QUEUED_MEDIUM_MSG : RXR_TX_QUEUED_RTS;
             dlist_insert_tail(&tx_entry->queued_entry,
                               &rxr_ep->tx_entry_queued_list);
             ret = 0;
