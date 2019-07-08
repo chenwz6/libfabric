@@ -89,7 +89,7 @@ ofi_recvwin_queue_msg(struct name *recvq, entrytype * msg, uint64_t id)	\
                                     \
 static inline entrytype *						\
 ofi_recvwin_get_msg(struct name *recvq, uint64_t id)		\
-{
+{		                                            \
     int read_idx;							\
 									\
 	assert(ofi_recvwin_is_allowed(recvq, id));			\
