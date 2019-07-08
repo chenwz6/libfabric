@@ -1264,41 +1264,6 @@ ssize_t rxr_ep_post_data(struct rxr_ep *rxr_ep,
 	return ret;
 }
 
-/*
- * For medium size message, we don't need a RTS/CTS handshake
- * Just send the data via several rts packets
- */
-ssize_t rxr_ep_post_medium_msg(struct rxr_ep *rxr_ep,
-                         struct rxr_tx_entry *tx_entry)
-{
-    struct rxr_pkt_entry *pkt_entry;
-    ssize_t ret;
-    uint64_t data_sent;
-
-    while(tx_entry->bytes_sent < tx_entry->total_len){
-        pkt_entry = rxr_get_pkt_entry(rxr_ep, rxr_ep->tx_pkt_pool);
-
-        if (OFI_UNLIKELY(!pkt_entry))
-            return -FI_EAGAIN;
-
-        /* We send a medium size message via several rts packets at a time */
-        rxr_init_rts_pkt_entry(rxr_ep, tx_entry, pkt_entry);
-
-        ret = rxr_ep_send_pkt(rxr_ep, pkt_entry, tx_entry->addr);
-        if (OFI_UNLIKELY(ret)) {
-            rxr_release_tx_pkt_entry(rxr_ep, pkt_entry);
-            return ret;
-        }
-
-        data_sent = MIN(rxr_get_rts_data_size(rxr_ep, rxr_get_rts_hdr(pkt_entry->pkt)),
-                tx_entry->total_len - tx_entry->bytes_sent);
-
-        tx_entry->bytes_sent += data_sent;
-    }
-
-    return 0;
-}
-
 ssize_t rxr_ep_post_read_response(struct rxr_ep *ep, struct rxr_tx_entry *tx_entry)
 {
 	struct rxr_pkt_entry *pkt_entry;
@@ -1504,6 +1469,41 @@ void rxr_init_rts_pkt_entry(struct rxr_ep *ep,
 
 	if (tx_entry->cq_entry.flags & FI_TAGGED)
 		rts_hdr->flags |= RXR_TAGGED;
+}
+
+/*
+ * For medium size message, we don't need a RTS/CTS handshake
+ * Just send the data via several rts packets
+ */
+ssize_t rxr_ep_post_medium_msg(struct rxr_ep *rxr_ep,
+                               struct rxr_tx_entry *tx_entry)
+{
+    struct rxr_pkt_entry *pkt_entry;
+    ssize_t ret;
+    uint64_t data_sent;
+
+    while(tx_entry->bytes_sent < tx_entry->total_len){
+        pkt_entry = rxr_get_pkt_entry(rxr_ep, rxr_ep->tx_pkt_pool);
+
+        if (OFI_UNLIKELY(!pkt_entry))
+            return -FI_EAGAIN;
+
+        /* We send a medium size message via several rts packets at a time */
+        rxr_init_rts_pkt_entry(rxr_ep, tx_entry, pkt_entry);
+
+        ret = rxr_ep_send_pkt(rxr_ep, pkt_entry, tx_entry->addr);
+        if (OFI_UNLIKELY(ret)) {
+            rxr_release_tx_pkt_entry(rxr_ep, pkt_entry);
+            return ret;
+        }
+
+        data_sent = MIN(rxr_get_rts_data_size(rxr_ep, rxr_get_rts_hdr(pkt_entry->pkt)),
+                        tx_entry->total_len - tx_entry->bytes_sent);
+
+        tx_entry->bytes_sent += data_sent;
+    }
+
+    return 0;
 }
 
 static void rxr_inline_mr_reg(struct rxr_domain *rxr_domain,
