@@ -863,6 +863,7 @@ static int rxr_cq_process_rts(struct rxr_ep *ep,
 	struct dlist_entry *match;
 	struct rxr_rx_entry *rx_entry;
 	struct rxr_tx_entry *tx_entry;
+    struct rxr_map_to_rx_entry *map_entry;
 	uint64_t bytes_left;
 	uint64_t tag = 0;
 	uint32_t op;
