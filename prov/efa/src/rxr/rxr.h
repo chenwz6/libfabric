@@ -117,7 +117,7 @@ extern const uint32_t rxr_poison_value;
 /*
  * Medium sized message cutoff
  */
-#define RXR_MEDIUM_MSG_THRESHOLD (64000)
+#define RXR_MEDIUM_MSG_THRESHOLD (16000)
 
 /*
  * RxR specific flags that are sent over the wire.
