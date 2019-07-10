@@ -55,6 +55,7 @@ struct rxr_env rxr_env = {
 	.rx_copy_ooo = 1,
 	.max_timeout = RXR_DEF_RNR_MAX_TIMEOUT,
 	.timeout_interval = 0, /* 0 is random timeout */
+	.medium_msg_limit = 64000,
 };
 
 static void rxr_init_env(void)
@@ -87,6 +88,7 @@ static void rxr_init_env(void)
 	fi_param_get_int(&rxr_prov, "max_timeout", &rxr_env.max_timeout);
 	fi_param_get_int(&rxr_prov, "timeout_interval",
 			 &rxr_env.timeout_interval);
+	fi_param_get_int(&rxr_prov, "medium_msg_limit", &rxr_env.medium_msg_limit);
 }
 
 void rxr_info_to_core_mr_modes(uint32_t version,

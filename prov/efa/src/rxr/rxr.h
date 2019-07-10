@@ -115,11 +115,6 @@ extern const uint32_t rxr_poison_value;
 #define RXR_MAX_NAME_LENGTH	(32)
 
 /*
- * Medium sized message cutoff
- */
-#define RXR_MEDIUM_MSG_THRESHOLD (16000)
-
-/*
  * RxR specific flags that are sent over the wire.
  */
 #define RXR_TAGGED		BIT_ULL(0)
@@ -190,6 +185,7 @@ struct rxr_env {
 	int rx_copy_ooo;
 	int max_timeout;
 	int timeout_interval;
+	int medium_msg_limit; /* medium size message cutoff */
 };
 
 enum rxr_pkt_type {
@@ -1315,7 +1311,7 @@ static inline int rxr_ep_post_cts_or_queue(struct rxr_ep *ep,
 static inline bool is_medium_size_message(struct rxr_tx_entry *tx_entry)
 {
     return (tx_entry->cq_entry.flags & FI_MSG)
-        && (tx_entry->total_len <= RXR_MEDIUM_MSG_THRESHOLD);
+        && (tx_entry->total_len <= rxr_env.medium_msg_limit);
 }
 
 static inline bool rxr_peer_timeout_expired(struct rxr_ep *ep,
