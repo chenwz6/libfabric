@@ -462,6 +462,8 @@ EFA_INI
 			"Set the maximum timeout (us) for backoff to a peer after a receiver not ready error. (Default: 1000000)");
 	fi_param_define(&rxr_prov, "timeout_interval", FI_PARAM_INT,
 			"Set the time interval (us) for the base timeout to use for exponential backoff to a peer after a receiver not ready error. (Default: 0 [random])");
+    fi_param_define(&rxr_prov, "medium_msg_limit", FI_PARAM_INT,
+            "Set the medium size threshold for messages. (Default: 64000)");
 	rxr_init_env();
 
 	lower_efa_prov = init_lower_efa_prov();
