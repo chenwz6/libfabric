@@ -973,8 +973,9 @@ static int rxr_cq_process_rts(struct rxr_ep *ep,
 	 * put the rx_entry into the hashtable for a medium size message
 	 */
 	if (rts_hdr->flags & RXR_MEDIUM_MSG_RTS) {
-	    ep->entry_count = ep->entry_count == ep->rx_size ? 0 : ep->entry_count++;
-       	    map_entry = ep->map_entry + ep->entry_count;
+	    size_t entry_count;
+	    entry_count = ep->entry_count == ep->rx_size ? 0 : ep->entry_count++;
+       	    map_entry = ep->map_entry + entry_count;
             map_entry->key.msg_id = rts_hdr->msg_id;
             map_entry->key.addr = pkt_entry->addr;
             map_entry->rx_entry = rx_entry;
