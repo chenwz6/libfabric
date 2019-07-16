@@ -837,12 +837,8 @@ void rxr_cq_recv_medium_data(struct rxr_ep *ep,
         }
         rx_entry->bytes_done += data_len;
 
+        //we cannot release rx_entry right now
         if (rx_entry->total_len == rx_entry->bytes_done) {
-            ret = rxr_cq_handle_rx_completion(ep, NULL,
-                                              pkt_entry, rx_entry);
-//            rxr_multi_recv_free_posted_entry(ep, rx_entry);
-            if (OFI_LIKELY(!ret))
-                rxr_release_rx_entry(ep, rx_entry);
             return;
         }
 
@@ -883,10 +879,15 @@ static int rxr_cq_process_rts(struct rxr_ep *ep,
             rx_entry = map_entry->rx_entry;
             if (rx_entry->state == RXR_RX_RECV) {
                 rxr_cq_recv_medium_data(ep, rx_entry, pkt_entry);
-                if (rx_entry->bytes_done != rx_entry->total_len)
-                    ret = RXR_WAIT_MEDIUM_MSG_RTS;
-                else
+                if (rx_entry->bytes_done == rx_entry->total_len) {
+                    ret = rxr_cq_handle_rx_completion(ep, NULL,
+                                                      pkt_entry, rx_entry);
+                    if (OFI_LIKELY(!ret))
+                        rxr_release_rx_entry(ep, rx_entry);
                     HASH_DEL(ep->rx_entry_map, map_entry);
+                    ret = 0;
+                } else
+                    ret = RXR_WAIT_MEDIUM_MSG_RTS;
             } else if (rx_entry->state == RXR_RX_UNEXP) {
                 /* Otherwise, it is an unexpected rx_entry and we need to queue it */
                 bytes_left = rx_entry->total_len - rxr_get_medium_pkt_data_size(ep, rts_hdr, pkt_entry);
@@ -996,6 +997,13 @@ static int rxr_cq_process_rts(struct rxr_ep *ep,
             rx_entry->cq_entry.len = MIN(rx_entry->total_len,
                                          rx_entry->cq_entry.len);
 	    rxr_cq_recv_medium_data(ep, rx_entry, pkt_entry);
+
+        if (rx_entry->bytes_done == rx_entry->total_len) {
+            ret = rxr_cq_handle_rx_completion(ep, NULL,
+                                              pkt_entry, rx_entry);
+            if (OFI_LIKELY(!ret))
+                rxr_release_rx_entry(ep, rx_entry);
+        }
 	    return 0;
 	}
 

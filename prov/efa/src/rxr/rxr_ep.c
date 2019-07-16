@@ -480,6 +480,12 @@ static int rxr_ep_handle_unexp_match(struct rxr_ep *ep,
 	if (rts_hdr->flags & RXR_MEDIUM_MSG_RTS) {
 	    rx_entry->state = RXR_RX_RECV;
 	    rxr_cq_recv_medium_data(ep, rx_entry, pkt_entry);
+        if (rx_entry->bytes_done == rx_entry->total_len) {
+            ret = rxr_cq_handle_rx_completion(ep, NULL,
+                                              pkt_entry, rx_entry);
+            if (OFI_LIKELY(!ret))
+                rxr_release_rx_entry(ep, rx_entry);
+        }
 	    return 0;
 	}
 
