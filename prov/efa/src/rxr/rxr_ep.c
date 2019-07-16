@@ -2803,6 +2803,15 @@ int rxr_endpoint(struct fid_domain *domain, struct fi_info *info,
 	if (!rxr_ep)
 		return -FI_ENOMEM;
 
+    /* Initialize rx_entry_map */
+    rxr_ep->rx_entry_map = NULL;
+    rxr_ep->entry_count = 0;
+    rxr_ep->map_entry = calloc(rxr_ep->rx_size, sizeof(*rxr_ep->map_entry));
+    if (!rxr_ep->map_entry) {
+        ret = -FI_ENOMEM;
+        goto err_free_ep;
+    }
+
 	rxr_domain = container_of(domain, struct rxr_domain,
 				  util_domain.domain_fid);
 	memset(&cq_attr, 0, sizeof(cq_attr));
@@ -2835,11 +2844,6 @@ int rxr_endpoint(struct fid_domain *domain, struct fi_info *info,
 	rxr_ep->core_rx_size = rdm_info->rx_attr->size;
 	rxr_ep->core_iov_limit = rdm_info->tx_attr->iov_limit;
 	rxr_ep->core_caps = rdm_info->caps;
-
-        /* Initialize rx_entry_map */
-        rxr_ep->rx_entry_map = NULL;
-        rxr_ep->entry_count = 0;
-        rxr_ep->map_entry = calloc(rxr_ep->rx_size, sizeof(*rxr_ep->map_entry));
 
 	cq_attr.size = MAX(rxr_ep->rx_size + rxr_ep->tx_size,
 			   rxr_env.cq_size);
