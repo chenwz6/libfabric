@@ -982,8 +982,16 @@ static int rxr_cq_process_rts(struct rxr_ep *ep,
             HASH_ADD(hh, ep->rx_entry_map, key, sizeof(map_entry->key), map_entry);
 	}
 
-	if (OFI_UNLIKELY(!match))
-		return 0;
+	if (OFI_UNLIKELY(!match)) {
+        if(rts_hdr->flags & RXR_MEDIUM_MSG_RTS) {
+            bytes_left = rts_hdr->data_len - rxr_get_medium_pkt_data_size(ep, rts_hdr, pkt_entry);
+            if(bytes_left) {
+                return RXR_WAIT_MEDIUM_MSG_RTS;
+            }
+        }
+	    return 0;
+	}
+
 
 	/*
 	 * TODO: Change protocol to contact sender to stop sending when the
@@ -1002,8 +1010,9 @@ static int rxr_cq_process_rts(struct rxr_ep *ep,
                                               pkt_entry, rx_entry);
             if (OFI_LIKELY(!ret))
                 rxr_release_rx_entry(ep, rx_entry);
+            return 0;
         }
-	    return 0;
+	    return RXR_WAIT_MEDIUM_MSG_RTS;
 	}
 
 	rxr_cq_recv_rts_data(ep, rx_entry, rts_hdr);
