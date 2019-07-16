@@ -477,7 +477,7 @@ static int rxr_ep_handle_unexp_match(struct rxr_ep *ep,
 	}
 
     /* For receiving medium size messages */
-	if(rts_hdr->flags & RXR_MEDIUM_MSG) {
+	if (rts_hdr->flags & RXR_MEDIUM_MSG_RTS) {
 	    rx_entry->state = RXR_RX_RECV;
 	    rxr_cq_recv_medium_data(ep, rx_entry, pkt_entry);
 	    return 0;
@@ -1433,12 +1433,12 @@ void rxr_init_rts_pkt_entry(struct rxr_ep *ep,
 		memcpy(src, &tx_entry->rma_window, sizeof(uint64_t));
 		src += sizeof(uint64_t);
 		pkt_entry->pkt_size += sizeof(uint64_t);
-	} else if(is_medium_size_message(tx_entry)) {
+	} else if (is_medium_size_message(tx_entry)) {
         /*
          * If this is a medium data packet, we need to send its offset as well.
          * Data packets are sent in order so using bytes_sent is okay here.
          */
-        rts_hdr->flags |= RXR_MEDIUM_MSG;
+        rts_hdr->flags |= RXR_MEDIUM_MSG_RTS;
         /* For medium size messages, offset should not be more than 4 bytes */
         memcpy(src, &tx_entry->bytes_sent, sizeof(uint32_t));
         src += sizeof(uint32_t);
@@ -2835,8 +2835,10 @@ int rxr_endpoint(struct fid_domain *domain, struct fi_info *info,
 	rxr_ep->core_iov_limit = rdm_info->tx_attr->iov_limit;
 	rxr_ep->core_caps = rdm_info->caps;
 
-    /* /Initialize rx_entry_map to NULL */
+    /* Initialize rx_entry_map */
     rxr_ep->rx_entry_map = NULL;
+    rxr_ep->entry_count = 0;
+    rxr_ep->map_entry = calloc(rxr_ep->rx_size, sizeof(*rxr_ep->map_entry));
 
 	cq_attr.size = MAX(rxr_ep->rx_size + rxr_ep->tx_size,
 			   rxr_env.cq_size);

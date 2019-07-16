@@ -115,6 +115,12 @@ extern const uint32_t rxr_poison_value;
 #define RXR_MAX_NAME_LENGTH	(32)
 
 /*
+ * For medium size message reordering,
+ * wait for other medium rts packets with the same msg_id
+ */
+#define RXR_WAIT_MEDIUM_MSG_RTS (100)
+
+/*
  * RxR specific flags that are sent over the wire.
  */
 #define RXR_TAGGED		BIT_ULL(0)
@@ -143,7 +149,7 @@ extern const uint32_t rxr_poison_value;
 /*
  * for medium size message
  */
-#define RXR_MEDIUM_MSG		(1 << 9)
+#define RXR_MEDIUM_MSG_RTS		(1 << 9)
 
 /*
  * OFI flags
@@ -470,7 +476,9 @@ struct rxr_ep {
 	struct rxr_robuf_fs *robuf_fs;
 
 	/* hashtable for medium size messages */
-    struct rxr_map_to_rx_entry *rx_entry_map;
+    size_t entry_count;
+	struct rxr_map_to_rx_entry *rx_entry_map;
+    struct rxr_map_to_rx_entry *map_entry;
 
 	/* core provider fid */
 	struct fid_ep *rdm_ep;
@@ -1036,11 +1044,44 @@ static inline uint64_t rxr_get_rts_data_size(struct rxr_ep *ep,
 		max_payload_size -= rts_hdr->rma_iov_count *
 					sizeof(struct fi_rma_iov);
 
-	if(rts_hdr->flags & RXR_MEDIUM_MSG)
+	if (rts_hdr->flags & RXR_MEDIUM_MSG_RTS)
 	    max_payload_size -= sizeof(uint32_t); /* medium data packets carry 4-byte offset */
 
 	return (rts_hdr->data_len > max_payload_size)
 		? max_payload_size : rts_hdr->data_len;
+}
+
+/* Compute medium message rts packet data size */
+static inline uint64_t rxr_get_medium_pkt_data_size(struct rxr_ep *ep,
+                                                struct rxr_rts_hdr *rts_hdr,
+                                                struct rxr_pkt_entry *pkt_entry)
+{
+    char *src;
+    uint32_t offset;
+    uint64_t data_len;
+    uint64_t total_len;
+    struct rxr_rx_entry *rx_entry;
+    struct rxr_tx_entry *tx_entry;
+
+    if (RXR_GET_X_ENTRY_TYPE(pkt_entry) == RXR_TX_ENTRY) {
+        tx_entry = (struct rxr_tx_entry *)pkt_entry->x_entry;
+        total_len = tx_entry->total_len;
+    } else if (RXR_GET_X_ENTRY_TYPE(pkt_entry) == RXR_RX_ENTRY) {
+        rx_entry = (struct rxr_rx_entry *)pkt_entry->x_entry;
+        total_len = rx_entry->total_len;
+    }
+
+    if (rts_hdr->flags & RXR_REMOTE_CQ_DATA) {
+        src = rxr_get_ctrl_cq_pkt(rts_hdr)->data + rts_hdr->addrlen;
+    } else {
+        src = rxr_get_ctrl_pkt(rts_hdr)->data + rts_hdr->addrlen;
+    }
+
+    memcpy(&offset, src, sizeof(uint32_t));
+    data_len = MIN(rxr_get_rts_data_size(ep, rts_hdr),
+            total_len - offset);
+
+    return data_len;
 }
 
 static inline size_t rxr_get_rx_pool_chunk_cnt(struct rxr_ep *ep)
