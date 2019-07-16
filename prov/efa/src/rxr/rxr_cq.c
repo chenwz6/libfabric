@@ -1229,7 +1229,6 @@ static void rxr_cq_handle_rts(struct rxr_ep *ep,
 
 	/* rxr_cq_process_rts will write error cq entry if needed */
 	ret = rxr_cq_process_rts(ep, pkt_entry);
-
 	if (ret == RXR_WAIT_MEDIUM_MSG_RTS || OFI_UNLIKELY(ret))
 		return;
 

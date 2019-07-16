@@ -2133,6 +2133,7 @@ static int rxr_ep_close(struct fid *fid)
 		retv = ret;
 	}
 	rxr_ep_free_res(rxr_ep);
+	free(rxr_ep->map_entry);
 	free(rxr_ep->peer);
 	free(rxr_ep);
 	return retv;
