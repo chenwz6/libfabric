@@ -858,8 +858,8 @@ static int rxr_cq_process_rts(struct rxr_ep *ep,
 	struct dlist_entry *match;
 	struct rxr_rx_entry *rx_entry;
 	struct rxr_tx_entry *tx_entry;
-        struct rxr_pkt_entry *cur_unexp_rts_pkt_entry; /* used to traversing multiple unexpected rts packets */
-        struct rxr_map_to_rx_entry key_entry, *map_entry; /* for rx_entry map */
+	struct rxr_pkt_entry *cur_unexp_rts_pkt_entry; /* used to traversing multiple unexpected rts packets */
+	struct rxr_map_to_rx_entry key_entry, *map_entry; /* for rx_entry map */
 	uint64_t bytes_left;
 	uint64_t tag = 0;
 	uint32_t op;
@@ -884,6 +884,7 @@ static int rxr_cq_process_rts(struct rxr_ep *ep,
                     if (OFI_LIKELY(!ret))
                         rxr_release_rx_entry(ep, rx_entry);
                     HASH_DEL(ep->rx_entry_map, map_entry);
+                    free(map_entry);
                     ret = 0;
                 } else
                     ret = RXR_WAIT_MEDIUM_MSG_RTS;
@@ -897,10 +898,11 @@ static int rxr_cq_process_rts(struct rxr_ep *ep,
                 }
                 bytes_left -= rxr_get_medium_pkt_data_size(ep, rts_hdr, cur_unexp_rts_pkt_entry);
                 cur_unexp_rts_pkt_entry->next = pkt_entry;
-                if (bytes_left)
-                    ret = RXR_WAIT_MEDIUM_MSG_RTS;
-                else
+                if (!bytes_left) {
                     HASH_DEL(ep->rx_entry_map, map_entry);
+                    free(map_entry);
+                } else
+                    ret = RXR_WAIT_MEDIUM_MSG_RTS;
             }
             return ret;
         }
@@ -973,12 +975,7 @@ static int rxr_cq_process_rts(struct rxr_ep *ep,
 	 * put the rx_entry into the hashtable for a medium size message
 	 */
 	if (rts_hdr->flags & RXR_MEDIUM_MSG_RTS) {
-       	    if (ep->entry_count < ep->rx_size) {
-       	        map_entry = ep->map_entry + ep->entry_count++;
-       	    } else {
-       	        ep->entry_count = 0;
-                map_entry = ep->map_entry;
-       	    }
+       	    map_entry = malloc(sizeof(*map_entry));
             memset(map_entry, 0, sizeof(*map_entry));
        	    map_entry->key.msg_id = rts_hdr->msg_id;
             map_entry->key.addr = pkt_entry->addr;
@@ -1158,6 +1155,11 @@ static void rxr_cq_proc_pending_items_in_recvwin(struct rxr_ep *ep,
 
 		/* rxr_cq_process_rts will write error cq entry if needed */
 		ret = rxr_cq_process_rts(ep, pending_pkt);
+		if (ret == RXR_WAIT_MEDIUM_MSG_RTS) {
+            ofi_recvwin_exp_dec(peer->robuf);
+		    return;
+		}
+
 		if (OFI_UNLIKELY(ret)) {
 			FI_WARN(&rxr_prov, FI_LOG_CQ,
 				"Error processing msg_id %d from robuf: %s\n",
@@ -1255,8 +1257,8 @@ static void rxr_cq_handle_rts(struct rxr_ep *ep,
 
 	/* process pending items in reorder buff */
 	if (rxr_need_sas_ordering(ep)) {
-            /* processing the expected packet */
-            ofi_recvwin_slide(peer->robuf);
+	    /* processing the expected packet */
+	    ofi_recvwin_slide(peer->robuf);
 	    rxr_cq_proc_pending_items_in_recvwin(ep, peer);
 	}
 

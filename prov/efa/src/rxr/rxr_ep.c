@@ -2139,7 +2139,6 @@ static int rxr_ep_close(struct fid *fid)
 		retv = ret;
 	}
 	rxr_ep_free_res(rxr_ep);
-	free(rxr_ep->map_entry);
 	free(rxr_ep->peer);
 	free(rxr_ep);
 	return retv;
@@ -2811,12 +2810,6 @@ int rxr_endpoint(struct fid_domain *domain, struct fi_info *info,
 
     /* Initialize rx_entry_map */
     rxr_ep->rx_entry_map = NULL;
-    rxr_ep->entry_count = 0;
-    rxr_ep->map_entry = calloc(info->rx_attr->size, sizeof(*rxr_ep->map_entry));
-    if (!rxr_ep->map_entry) {
-        ret = -FI_ENOMEM;
-        goto err_free_ep;
-    }
 
 	rxr_domain = container_of(domain, struct rxr_domain,
 				  util_domain.domain_fid);

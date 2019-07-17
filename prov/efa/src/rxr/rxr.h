@@ -476,9 +476,7 @@ struct rxr_ep {
 	struct rxr_robuf_fs *robuf_fs;
 
 	/* hashtable for medium size messages */
-        size_t entry_count;
 	struct rxr_map_to_rx_entry *rx_entry_map;
-        struct rxr_map_to_rx_entry *map_entry;
 
 	/* core provider fid */
 	struct fid_ep *rdm_ep;
