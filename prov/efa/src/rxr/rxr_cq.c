@@ -975,8 +975,8 @@ static int rxr_cq_process_rts(struct rxr_ep *ep,
 	if (rts_hdr->flags & RXR_MEDIUM_MSG_RTS) {
 	    size_t entry_count;
 	    entry_count = ep->entry_count == ep->rx_size ? 0 : ep->entry_count++;
-       	    map_entry = &(ep->map_entry[entry_count]);
-            memset(map_entry, 0, sizeof(struct rxr_map_to_rx_entry));
+       	    map_entry = ep->map_entry + entry_count;
+            memset(map_entry, 0, sizeof(*map_entry));
        	    map_entry->key.msg_id = rts_hdr->msg_id;
             map_entry->key.addr = pkt_entry->addr;
             map_entry->rx_entry = rx_entry;
