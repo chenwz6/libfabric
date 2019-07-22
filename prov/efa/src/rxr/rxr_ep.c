@@ -1440,7 +1440,7 @@ void rxr_init_rts_pkt_entry(struct rxr_ep *ep,
 		memcpy(src, &tx_entry->rma_window, sizeof(uint64_t));
 		src += sizeof(uint64_t);
 		pkt_entry->pkt_size += sizeof(uint64_t);
-	} else if (is_medium_size_message(tx_entry)) {
+	} else if (is_medium_size_message(ep, tx_entry)) {
         /*
          * If this is a medium data packet, we need to send its offset as well.
          * Data packets are sent in order so using bytes_sent is okay here.
@@ -1728,7 +1728,7 @@ ssize_t rxr_tx(struct fid_ep *ep, const struct iovec *iov, size_t iov_count,
 
     if (OFI_UNLIKELY(ret)) {
         if (ret == -FI_EAGAIN) {
-            tx_entry->state = is_medium_size_message(tx_entry) ?
+            tx_entry->state = is_medium_size_message(rxr_ep, tx_entry) ?
                     RXR_TX_QUEUED_MEDIUM_MSG : RXR_TX_QUEUED_RTS;
             dlist_insert_tail(&tx_entry->queued_entry,
                               &rxr_ep->tx_entry_queued_list);
