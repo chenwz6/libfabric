@@ -1186,9 +1186,10 @@ void rxr_cq_recv_rts_data(struct rxr_ep *ep,
 			  struct rxr_rx_entry *rx_entry,
 			  struct rxr_rts_hdr *rts_hdr);
 
-void rxr_cq_recv_medium_data(struct rxr_ep *ep,
+int rxr_cq_recv_medium_data(struct rxr_ep *ep,
               struct rxr_rx_entry *rx_entry,
-              struct rxr_pkt_entry *pkt_entry);
+              struct rxr_pkt_entry *pkt_entry,
+              struct rxr_map_to_rx_entry *map_entry);
 
 void rxr_cq_handle_pkt_recv_completion(struct rxr_ep *ep,
 				       struct fi_cq_msg_entry *comp,

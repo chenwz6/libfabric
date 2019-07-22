@@ -796,11 +796,11 @@ void rxr_cq_recv_rts_data(struct rxr_ep *ep,
 	}
 }
 
-void rxr_cq_recv_medium_data(struct rxr_ep *ep,
+int rxr_cq_recv_medium_data(struct rxr_ep *ep,
 			      struct rxr_rx_entry *rx_entry,
-			      struct rxr_pkt_entry *pkt_entry)
+			      struct rxr_pkt_entry *pkt_entry,
+                  struct rxr_map_to_rx_entry *map_entry)
 {
-
     /* There maybe multiple rts packets for a medium size message because of queuing */
     while(pkt_entry) {
 
@@ -838,7 +838,13 @@ void rxr_cq_recv_medium_data(struct rxr_ep *ep,
 
         //we cannot release rx_entry right now
         if (rx_entry->total_len == rx_entry->bytes_done) {
-            return;
+            ret = rxr_cq_handle_rx_completion(ep, NULL,
+                                              pkt_entry, rx_entry);
+            if (OFI_LIKELY(!ret))
+                rxr_release_rx_entry(ep, rx_entry);
+            HASH_DEL(ep->rx_entry_map, map_entry);
+            free(map_entry);
+            return 0;
         }
 
         prev_pkt_entry = pkt_entry;
@@ -848,7 +854,7 @@ void rxr_cq_recv_medium_data(struct rxr_ep *ep,
         rxr_release_rx_pkt_entry(ep, prev_pkt_entry);
     }
 
-    return;
+    return RXR_WAIT_MEDIUM_MSG_RTS;
 }
 
 static int rxr_cq_process_rts(struct rxr_ep *ep,
@@ -877,17 +883,7 @@ static int rxr_cq_process_rts(struct rxr_ep *ep,
             /* If rx_entry exists, then we need to check its comm state */
             rx_entry = map_entry->rx_entry;
             if (rx_entry->state == RXR_RX_RECV) {
-                rxr_cq_recv_medium_data(ep, rx_entry, pkt_entry);
-                if (rx_entry->bytes_done == rx_entry->total_len) {
-                    ret = rxr_cq_handle_rx_completion(ep, NULL,
-                                                      pkt_entry, rx_entry);
-                    if (OFI_LIKELY(!ret))
-                        rxr_release_rx_entry(ep, rx_entry);
-                    HASH_DEL(ep->rx_entry_map, map_entry);
-                    free(map_entry);
-                    ret = 0;
-                } else
-                    ret = RXR_WAIT_MEDIUM_MSG_RTS;
+                ret = rxr_cq_recv_medium_data(ep, rx_entry, pkt_entry, map_entry);
             } else if (rx_entry->state == RXR_RX_UNEXP) {
                 /* Otherwise, it is an unexpected rx_entry and we need to queue it */
                 bytes_left = rx_entry->total_len - rxr_get_medium_pkt_data_size(ep, rts_hdr, pkt_entry);
@@ -898,11 +894,9 @@ static int rxr_cq_process_rts(struct rxr_ep *ep,
                 }
                 bytes_left -= rxr_get_medium_pkt_data_size(ep, rts_hdr, cur_unexp_rts_pkt_entry);
                 cur_unexp_rts_pkt_entry->next = pkt_entry;
-                if (!bytes_left) {
-                    HASH_DEL(ep->rx_entry_map, map_entry);
-                    free(map_entry);
-                } else
+                if (bytes_left) {
                     ret = RXR_WAIT_MEDIUM_MSG_RTS;
+                }
             }
             return ret;
         }
@@ -1001,19 +995,11 @@ static int rxr_cq_process_rts(struct rxr_ep *ep,
 
 	/* For receiving medium size messages */
 	if (rts_hdr->flags & RXR_MEDIUM_MSG_RTS) {
-            rx_entry->state = RXR_RX_RECV;
-            rx_entry->cq_entry.len = MIN(rx_entry->total_len,
+	    rx_entry->state = RXR_RX_RECV;
+	    rx_entry->cq_entry.len = MIN(rx_entry->total_len,
                                          rx_entry->cq_entry.len);
-	    rxr_cq_recv_medium_data(ep, rx_entry, pkt_entry);
-
-        if (rx_entry->bytes_done == rx_entry->total_len) {
-            ret = rxr_cq_handle_rx_completion(ep, NULL,
-                                              pkt_entry, rx_entry);
-            if (OFI_LIKELY(!ret))
-                rxr_release_rx_entry(ep, rx_entry);
-            return 0;
-        }
-	    return RXR_WAIT_MEDIUM_MSG_RTS;
+	    ret = rxr_cq_recv_medium_data(ep, rx_entry, pkt_entry, map_entry);
+	    return ret;
 	}
 
 	rxr_cq_recv_rts_data(ep, rx_entry, rts_hdr);
@@ -1123,15 +1109,20 @@ static int rxr_cq_reorder_msg(struct rxr_ep *ep,
 	}
 
     /* Check the queue first by msg_id, if it is a duplicate one, link it to the tail of pkt_entry */
-    cur_ooo_entry = *ofi_recvwin_get_msg(peer->robuf, rts_hdr->msg_id);
-    if(cur_ooo_entry) {
-        while(cur_ooo_entry->next) {
-            cur_ooo_entry = cur_ooo_entry->next;
+    if(rts_hdr->flags & RXR_MEDIUM_MSG_RTS) {
+        cur_ooo_entry = *ofi_recvwin_get_msg(peer->robuf, rts_hdr->msg_id);
+        if(cur_ooo_entry) {
+            while(cur_ooo_entry->next) {
+                cur_ooo_entry = cur_ooo_entry->next;
+            }
+            cur_ooo_entry->next = ooo_entry;
+        } else {
+            ofi_recvwin_queue_msg(peer->robuf, &ooo_entry, rts_hdr->msg_id);
         }
-        cur_ooo_entry->next = ooo_entry;
-    } else {
-        ofi_recvwin_queue_msg(peer->robuf, &ooo_entry, rts_hdr->msg_id);
     }
+
+    ofi_recvwin_queue_msg(peer->robuf, &ooo_entry, rts_hdr->msg_id);
+
 	return 1;
 }
 
@@ -1156,7 +1147,11 @@ static void rxr_cq_proc_pending_items_in_recvwin(struct rxr_ep *ep,
 		/* rxr_cq_process_rts will write error cq entry if needed */
 		ret = rxr_cq_process_rts(ep, pending_pkt);
 		if (ret == RXR_WAIT_MEDIUM_MSG_RTS) {
-            ofi_recvwin_exp_dec(peer->robuf);
+            /*
+             * If this is a medium message rts, we cannot move the receive window here
+             * because some medium rts packets may not arrive yet
+             */
+		    ofi_recvwin_exp_dec(peer->robuf);
 		    return;
 		}
 

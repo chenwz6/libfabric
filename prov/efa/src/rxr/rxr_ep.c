@@ -439,6 +439,7 @@ static int rxr_ep_handle_unexp_match(struct rxr_ep *ep,
 {
 	struct rxr_pkt_entry *pkt_entry;
 	struct rxr_rts_hdr *rts_hdr;
+    struct rxr_map_to_rx_entry key_entry, *map_entry;
 	uint64_t bytes_left, len;
 	int ret = 0;
 
@@ -478,15 +479,15 @@ static int rxr_ep_handle_unexp_match(struct rxr_ep *ep,
 
         /* For receiving medium size messages */
 	if (rts_hdr->flags & RXR_MEDIUM_MSG_RTS) {
-	    rx_entry->state = RXR_RX_RECV;
-	    rxr_cq_recv_medium_data(ep, rx_entry, pkt_entry);
-        if (rx_entry->bytes_done == rx_entry->total_len) {
-            ret = rxr_cq_handle_rx_completion(ep, NULL,
-                                              pkt_entry, rx_entry);
-            if (OFI_LIKELY(!ret))
-                rxr_release_rx_entry(ep, rx_entry);
-        }
-	    return 0;
+        // find the corresponding map_entry which may be used when receiving data
+	    memset(&key_entry, 0, sizeof(key_entry));
+        key_entry.key.msg_id = rts_hdr->msg_id;
+        key_entry.key.addr = pkt_entry->addr;
+        HASH_FIND(hh, ep->rx_entry_map, &key_entry.key, sizeof(key_entry.key), map_entry);
+
+        rx_entry->state = RXR_RX_RECV;
+	    ret = rxr_cq_recv_medium_data(ep, rx_entry, pkt_entry, map_entry);
+	    return ret;
 	}
 
 	rxr_cq_recv_rts_data(ep, rx_entry, rts_hdr);
