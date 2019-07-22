@@ -801,6 +801,8 @@ int rxr_cq_recv_medium_data(struct rxr_ep *ep,
 			      struct rxr_pkt_entry *pkt_entry,
                   struct rxr_map_to_rx_entry *map_entry)
 {
+    int ret = 0
+
     /* There maybe multiple rts packets for a medium size message because of queuing */
     while(pkt_entry) {
 
