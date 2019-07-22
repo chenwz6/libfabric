@@ -1718,7 +1718,7 @@ ssize_t rxr_tx(struct fid_ep *ep, const struct iovec *iov, size_t iov_count,
 	 * If this is a regular message with length <= 16K,
 	 * several rts data packets will be sent, otherwise send a regular rts
 	 */
-	if(is_medium_size_message(tx_entry)){
+	if(is_medium_size_message(rxr_ep, tx_entry)){
 	    /* tx_entry now sending medium size message, need to change its comm type */
 	    tx_entry->state = RXR_TX_MEDIUM_MSG;
 	    ret = rxr_ep_post_medium_msg(rxr_ep, tx_entry);
