@@ -830,7 +830,7 @@ int rxr_cq_recv_medium_data(struct rxr_ep *ep,
         data_len = MIN(rxr_get_rts_data_size(ep, rts_hdr), rx_entry->total_len - offset);
 
         /* we are sinking message for CANCEL/DISCARD entry */
-        if(OFI_LIKELY(!(rx_entry->rxr_flags & RXR_RECV_CANCEL))) {
+        if (OFI_LIKELY(!(rx_entry->rxr_flags & RXR_RECV_CANCEL))) {
             ofi_copy_to_iov(rx_entry->iov, rx_entry->iov_count,
                                                     offset, data, data_len);
         }
@@ -843,7 +843,7 @@ int rxr_cq_recv_medium_data(struct rxr_ep *ep,
             if (OFI_LIKELY(!ret))
                 rxr_release_rx_entry(ep, rx_entry);
             HASH_DEL(ep->rx_entry_map, map_entry);
-            free(map_entry);
+            ofi_buf_free(map_entry);
             return 0;
         }
 
@@ -894,9 +894,8 @@ static int rxr_cq_process_rts(struct rxr_ep *ep,
                 }
                 bytes_left -= rxr_get_medium_pkt_data_size(ep, rts_hdr, cur_unexp_rts_pkt_entry);
                 cur_unexp_rts_pkt_entry->next = pkt_entry;
-                if (bytes_left) {
+                if (bytes_left)
                     ret = RXR_WAIT_MEDIUM_MSG_RTS;
-                }
             }
             return ret;
         }
@@ -969,12 +968,18 @@ static int rxr_cq_process_rts(struct rxr_ep *ep,
 	 * put the rx_entry into the hashtable for a medium size message
 	 */
 	if (rts_hdr->flags & RXR_MEDIUM_MSG_RTS) {
-       	    map_entry = malloc(sizeof(*map_entry));
-            memset(map_entry, 0, sizeof(*map_entry));
-       	    map_entry->key.msg_id = rts_hdr->msg_id;
-            map_entry->key.addr = pkt_entry->addr;
-            map_entry->rx_entry = rx_entry;
-            HASH_ADD(hh, ep->rx_entry_map, key, sizeof(map_entry->key), map_entry);
+	    map_entry = ofi_buf_alloc(ep->map_entry_pool);
+	    if (OFI_UNLIKELY(!map_entry)) {
+            FI_WARN(&rxr_prov, FI_LOG_CQ,
+                "Map entries for medium size message exhausted.\n");
+            rxr_eq_write_error(ep, FI_ENOBUFS, -FI_ENOBUFS);
+            return -FI_ENOBUFS;
+	    }
+	    memset(map_entry, 0, sizeof(*map_entry));
+	    map_entry->key.msg_id = rts_hdr->msg_id;
+	    map_entry->key.addr = pkt_entry->addr;
+	    map_entry->rx_entry = rx_entry;
+	    HASH_ADD(hh, ep->rx_entry_map, key, sizeof(map_entry->key), map_entry);
 	}
 
 	if (OFI_UNLIKELY(!match)) {
@@ -1109,10 +1114,10 @@ static int rxr_cq_reorder_msg(struct rxr_ep *ep,
 	}
 
     /* Check the queue first by msg_id, if it is a duplicate one, link it to the tail of pkt_entry */
-    if(rts_hdr->flags & RXR_MEDIUM_MSG_RTS) {
+    if (rts_hdr->flags & RXR_MEDIUM_MSG_RTS) {
         cur_ooo_entry = *ofi_recvwin_get_msg(peer->robuf, rts_hdr->msg_id);
-        if(cur_ooo_entry) {
-            while(cur_ooo_entry->next) {
+        if (cur_ooo_entry) {
+            while (cur_ooo_entry->next) {
                 cur_ooo_entry = cur_ooo_entry->next;
             }
             cur_ooo_entry->next = ooo_entry;

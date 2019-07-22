@@ -534,6 +534,8 @@ struct rxr_ep {
 	struct ofi_bufpool *rx_entry_pool;
 	/* datastructure to maintain read response */
 	struct ofi_bufpool *readrsp_tx_entry_pool;
+	/* datastructure to maintain map_entry for medium size messages */
+    struct ofi_bufpool *map_entry_pool;
 
 	/* rx_entries with recv buf */
 	struct dlist_entry rx_list;

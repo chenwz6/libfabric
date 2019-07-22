@@ -2102,6 +2102,9 @@ static void rxr_ep_free_res(struct rxr_ep *rxr_ep)
 	if (rxr_ep->readrsp_tx_entry_pool)
 		ofi_bufpool_destroy(rxr_ep->readrsp_tx_entry_pool);
 
+	if (rxr_ep->map_entry_pool)
+        ofi_bufpool_destroy(rxr_ep->map_entry_pool);
+
 	if (rxr_ep->rx_ooo_pkt_pool)
 		ofi_bufpool_destroy(rxr_ep->rx_ooo_pkt_pool);
 
@@ -2480,6 +2483,14 @@ int rxr_ep_init(struct rxr_ep *ep)
 	if (ret)
 		goto err_free_readrsp_tx_entry_pool;
 
+	ret = ofi_bufpool_create(&ep->map_entry_pool,
+                 sizeof(struct rxr_map_to_rx_entry),
+                 RXR_BUF_POOL_ALIGNMENT,
+                 RXR_MAX_RX_QUEUE_SIZE,
+                 ep->rx_size, 0);
+	if (ret)
+	    goto err_free_map_entry_pool;
+
 	/* Initialize entry list */
 	dlist_init(&ep->rx_list);
 	dlist_init(&ep->rx_unexp_list);
@@ -2518,6 +2529,9 @@ err_free_rx_pool:
 err_free_tx_pool:
 	if (ep->tx_pkt_pool)
 		ofi_bufpool_destroy(ep->tx_pkt_pool);
+err_free_map_entry_pool:
+    if (ep->map_entry_pool)
+        ofi_bufpool_destroy(ep->map_entry_pool);
 err_out:
 	return ret;
 }
