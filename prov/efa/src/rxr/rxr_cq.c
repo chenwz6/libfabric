@@ -834,9 +834,8 @@ int rxr_cq_recv_medium_data(struct rxr_ep *ep,
             ofi_copy_to_iov(rx_entry->iov, rx_entry->iov_count,
                                                     offset, data, data_len);
         }
-        rx_entry->bytes_done += data_len;
 
-        //we cannot release rx_entry right now
+        rx_entry->bytes_done += data_len;
         if (rx_entry->total_len == rx_entry->bytes_done) {
             ret = rxr_cq_handle_rx_completion(ep, NULL,
                                               pkt_entry, rx_entry);
