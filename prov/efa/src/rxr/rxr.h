@@ -1053,23 +1053,14 @@ static inline uint64_t rxr_get_rts_data_size(struct rxr_ep *ep,
 
 /* Compute medium message rts packet data size */
 static inline uint64_t rxr_get_medium_pkt_data_size(struct rxr_ep *ep,
-                                                struct rxr_rts_hdr *rts_hdr,
-                                                struct rxr_pkt_entry *pkt_entry)
+                                                    struct rxr_pkt_entry *pkt_entry)
 {
     char *src;
     uint32_t offset;
     uint64_t data_len;
-    uint64_t total_len;
-    struct rxr_rx_entry *rx_entry;
-    struct rxr_tx_entry *tx_entry;
+    struct rxr_rts_hdr *rts_hdr;
 
-    if (RXR_GET_X_ENTRY_TYPE(pkt_entry) == RXR_TX_ENTRY) {
-        tx_entry = (struct rxr_tx_entry *)pkt_entry->x_entry;
-        total_len = tx_entry->total_len;
-    } else if (RXR_GET_X_ENTRY_TYPE(pkt_entry) == RXR_RX_ENTRY) {
-        rx_entry = (struct rxr_rx_entry *)pkt_entry->x_entry;
-        total_len = rx_entry->total_len;
-    }
+    rts_hdr = rxr_get_rts_hdr(pkt_entry->pkt);
 
     if (rts_hdr->flags & RXR_REMOTE_CQ_DATA) {
         src = rxr_get_ctrl_cq_pkt(rts_hdr)->data + rts_hdr->addrlen;
@@ -1079,7 +1070,7 @@ static inline uint64_t rxr_get_medium_pkt_data_size(struct rxr_ep *ep,
 
     memcpy(&offset, src, sizeof(uint32_t));
     data_len = MIN(rxr_get_rts_data_size(ep, rts_hdr),
-            total_len - offset);
+            rts_hdr->data_len - offset);
 
     return data_len;
 }
@@ -1354,7 +1345,8 @@ static inline bool is_medium_size_message(struct rxr_ep *rxr_ep,
                                           struct rxr_tx_entry *tx_entry)
 {
     return (tx_entry->cq_entry.flags & FI_MSG)
-        && (tx_entry->total_len > rxr_ep->mtu_size) && (tx_entry->total_len <= rxr_env.medium_msg_limit);
+        && (tx_entry->total_len > rxr_ep->mtu_size)
+        && (tx_entry->total_len <= rxr_env.medium_msg_limit);
 }
 
 static inline bool rxr_peer_timeout_expired(struct rxr_ep *ep,
