@@ -841,10 +841,11 @@ int rxr_cq_recv_medium_data(struct rxr_ep *ep,
         if (rx_entry->total_len == rx_entry->bytes_done) {
             ret = rxr_cq_handle_rx_completion(ep, NULL,
                                               pkt_entry, rx_entry);
-            if (OFI_LIKELY(!ret))
+            if (OFI_LIKELY(!ret)) {
                 rxr_release_rx_entry(ep, rx_entry);
-            HASH_DEL(ep->rx_entry_map, map_entry);
-            ofi_buf_free(map_entry);
+                HASH_DEL(ep->rx_entry_map, map_entry);
+                ofi_buf_free(map_entry);
+            }
             return 0;
         }
 
