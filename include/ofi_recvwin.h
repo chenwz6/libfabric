@@ -86,7 +86,19 @@ ofi_recvwin_queue_msg(struct name *recvq, entrytype * msg, uint64_t id)	\
 	ofi_cirque_commit(recvq->pending);				\
 	return 0;							\
 }									\
+				                                        \
+static inline entrytype *						\
+ofi_recvwin_get_msg(struct name *recvq, uint64_t id)	   		\
+{		                                           		\
+    int read_idx;							\
 									\
+	assert(ofi_recvwin_is_allowed(recvq, id));			\
+	read_idx = (ofi_cirque_rindex(recvq->pending)			\
+		    + (id - recvq->exp_msg_id))				\
+		    & recvq->pending->size_mask;			\
+	return &recvq->pending->buf[read_idx];				\
+}									\
+                                   					\
 static inline entrytype *						\
 ofi_recvwin_get_next_msg(struct name *recvq)				\
 {									\
@@ -109,6 +121,7 @@ ofi_recvwin_slide(struct name *recvq)					\
 #define ofi_recvwin_peek(rq)		(ofi_cirque_head(rq->pending))
 #define ofi_recvwin_is_empty(rq)	(ofi_cirque_isempty(rq->pending))
 #define ofi_recvwin_exp_inc(rq)		((rq)->exp_msg_id++)
+#define ofi_recvwin_exp_dec(rq)		((rq)->exp_msg_id--)
 #define ofi_recvwin_is_exp(rq, id)	((rq)->exp_msg_id == id)
 #define ofi_recvwin_next_exp_id(rq)	((rq)->exp_msg_id)
 #define ofi_recvwin_is_delayed(rq, id)	((rq)->exp_msg_id > id)

@@ -439,6 +439,7 @@ static int rxr_ep_handle_unexp_match(struct rxr_ep *ep,
 {
 	struct rxr_pkt_entry *pkt_entry;
 	struct rxr_rts_hdr *rts_hdr;
+        struct rxr_map_to_rx_entry key_entry, *map_entry;
 	uint64_t bytes_left, len;
 	int ret = 0;
 
@@ -474,6 +475,19 @@ static int rxr_ep_handle_unexp_match(struct rxr_ep *ep,
 	} else {
 		rx_entry->cq_entry.tag = 0;
 		rx_entry->ignore = ~0;
+	}
+
+        /* For receiving medium size messages */
+	if (rts_hdr->flags & RXR_MEDIUM_MSG_RTS) {
+        // find the corresponding map_entry which may be used when receiving data
+	    memset(&key_entry, 0, sizeof(key_entry));
+            key_entry.key.msg_id = rts_hdr->msg_id;
+            key_entry.key.addr = pkt_entry->addr;
+            HASH_FIND(hh, ep->rx_entry_map, &key_entry.key, sizeof(key_entry.key), map_entry);
+
+            rx_entry->state = RXR_RX_RECV;
+	    ret = rxr_cq_recv_medium_data(ep, rx_entry, pkt_entry, map_entry);
+	    return ret;
 	}
 
 	rxr_cq_recv_rts_data(ep, rx_entry, rts_hdr);
@@ -1426,6 +1440,27 @@ void rxr_init_rts_pkt_entry(struct rxr_ep *ep,
 		memcpy(src, &tx_entry->rma_window, sizeof(uint64_t));
 		src += sizeof(uint64_t);
 		pkt_entry->pkt_size += sizeof(uint64_t);
+	} else if (is_medium_size_message(ep, tx_entry)) {
+        /*
+         * If this is a medium data packet, we need to send its offset as well.
+         * Data packets are sent in order so using bytes_sent is okay here.
+         */
+        rts_hdr->flags |= RXR_MEDIUM_MSG_RTS;
+        /* For medium size messages, offset should not be more than 4 bytes */
+        memcpy(src, &tx_entry->bytes_sent, sizeof(uint32_t));
+        src += sizeof(uint32_t);
+        pkt_entry->pkt_size += sizeof(uint32_t);
+
+        uint64_t payload_size;
+        payload_size = MIN(tx_entry->total_len - tx_entry->bytes_sent,
+                           mtu - pkt_entry->pkt_size);
+
+        data = src;
+        data_len = ofi_copy_from_iov(data, payload_size,
+                                     tx_entry->iov, tx_entry->iov_count, tx_entry->bytes_sent);
+        assert(data_len == payload_size);
+
+        pkt_entry->pkt_size += data_len;
 	} else {
 		data = src;
 		data_len = ofi_copy_from_iov(data, mtu - pkt_entry->pkt_size,
@@ -1441,6 +1476,41 @@ void rxr_init_rts_pkt_entry(struct rxr_ep *ep,
 
 	if (tx_entry->cq_entry.flags & FI_TAGGED)
 		rts_hdr->flags |= RXR_TAGGED;
+}
+
+/*
+ * For medium size message, we don't need a RTS/CTS handshake
+ * Just send the data via several rts packets
+ */
+ssize_t rxr_ep_post_medium_msg(struct rxr_ep *rxr_ep,
+                               struct rxr_tx_entry *tx_entry)
+{
+    struct rxr_pkt_entry *pkt_entry;
+    ssize_t ret;
+    uint64_t data_sent;
+
+    while(tx_entry->bytes_sent < tx_entry->total_len){
+        pkt_entry = rxr_get_pkt_entry(rxr_ep, rxr_ep->tx_pkt_pool);
+
+        if (OFI_UNLIKELY(!pkt_entry))
+            return -FI_EAGAIN;
+
+        /* We send a medium size message via several rts packets at a time */
+        rxr_init_rts_pkt_entry(rxr_ep, tx_entry, pkt_entry);
+
+        ret = rxr_ep_send_pkt(rxr_ep, pkt_entry, tx_entry->addr);
+        if (OFI_UNLIKELY(ret)) {
+            rxr_release_tx_pkt_entry(rxr_ep, pkt_entry);
+            return ret;
+        }
+
+        data_sent = MIN(rxr_get_rts_data_size(rxr_ep, rxr_get_rts_hdr(pkt_entry->pkt)),
+                        tx_entry->total_len - tx_entry->bytes_sent);
+
+        tx_entry->bytes_sent += data_sent;
+    }
+
+    return 0;
 }
 
 static void rxr_inline_mr_reg(struct rxr_domain *rxr_domain,
@@ -1644,19 +1714,30 @@ ssize_t rxr_tx(struct fid_ep *ep, const struct iovec *iov, size_t iov_count,
 		tx_entry->rma_window = rx_entry->window;
 	}
 
-	ret = rxr_ep_post_rts(rxr_ep, tx_entry);
-
-	if (OFI_UNLIKELY(ret)) {
-		if (ret == -FI_EAGAIN) {
-			tx_entry->state = RXR_TX_QUEUED_RTS;
-			dlist_insert_tail(&tx_entry->queued_entry,
-					  &rxr_ep->tx_entry_queued_list);
-			ret = 0;
-		} else {
-			peer = rxr_ep_get_peer(rxr_ep, addr);
-			peer->next_msg_id--;
-		}
+	/*
+	 * If this is a regular message with length <= 16K,
+	 * several rts data packets will be sent, otherwise send a regular rts
+	 */
+	if (is_medium_size_message(rxr_ep, tx_entry)) {
+	    /* tx_entry now sending medium size message, need to change its comm type */
+	    tx_entry->state = RXR_TX_MEDIUM_MSG;
+	    ret = rxr_ep_post_medium_msg(rxr_ep, tx_entry);
+   	} else {
+       	    ret = rxr_ep_post_rts(rxr_ep, tx_entry);
 	}
+
+   	if (OFI_UNLIKELY(ret)) {
+        	if (ret == -FI_EAGAIN) {
+        		tx_entry->state = is_medium_size_message(rxr_ep, tx_entry) ?
+                    		       RXR_TX_QUEUED_MEDIUM_MSG : RXR_TX_QUEUED_RTS;
+           		dlist_insert_tail(&tx_entry->queued_entry,
+                              	                     &rxr_ep->tx_entry_queued_list);
+           		ret = 0;
+       		} else {
+           		peer = rxr_ep_get_peer(rxr_ep, addr);
+           		peer->next_msg_id--;
+       		}
+   	}
 
 out:
 	fastlock_release(&rxr_ep->util_ep.lock);
@@ -2020,6 +2101,9 @@ static void rxr_ep_free_res(struct rxr_ep *rxr_ep)
 
 	if (rxr_ep->readrsp_tx_entry_pool)
 		ofi_bufpool_destroy(rxr_ep->readrsp_tx_entry_pool);
+
+	if (rxr_ep->map_entry_pool)
+        	ofi_bufpool_destroy(rxr_ep->map_entry_pool);
 
 	if (rxr_ep->rx_ooo_pkt_pool)
 		ofi_bufpool_destroy(rxr_ep->rx_ooo_pkt_pool);
@@ -2399,6 +2483,14 @@ int rxr_ep_init(struct rxr_ep *ep)
 	if (ret)
 		goto err_free_readrsp_tx_entry_pool;
 
+	ret = ofi_bufpool_create(&ep->map_entry_pool,
+                		 sizeof(struct rxr_map_to_rx_entry),
+                		 RXR_BUF_POOL_ALIGNMENT,
+                		 RXR_MAX_RX_QUEUE_SIZE,
+                		 ep->rx_size, 0);
+	if (ret)
+	   	 goto err_free_map_entry_pool;
+
 	/* Initialize entry list */
 	dlist_init(&ep->rx_list);
 	dlist_init(&ep->rx_unexp_list);
@@ -2437,6 +2529,9 @@ err_free_rx_pool:
 err_free_tx_pool:
 	if (ep->tx_pkt_pool)
 		ofi_bufpool_destroy(ep->tx_pkt_pool);
+err_free_map_entry_pool:
+   	if (ep->map_entry_pool)
+       		ofi_bufpool_destroy(ep->map_entry_pool);
 err_out:
 	return ret;
 }
@@ -2625,6 +2720,8 @@ static void rxr_ep_progress_internal(struct rxr_ep *ep)
 				     tx_entry, queued_entry, tmp) {
 		if (tx_entry->state == RXR_TX_QUEUED_RTS)
 			ret = rxr_ep_post_rts(ep, tx_entry);
+		else if (tx_entry->state == RXR_TX_QUEUED_MEDIUM_MSG)
+		    ret = rxr_ep_post_medium_msg(ep, tx_entry);
 		else if (tx_entry->state == RXR_TX_QUEUED_READ_RESPONSE)
 			ret = rxr_ep_post_read_response(ep, tx_entry);
 		else
@@ -2641,14 +2738,24 @@ static void rxr_ep_progress_internal(struct rxr_ep *ep)
 		if (tx_entry->state == RXR_TX_QUEUED_RTS ||
 		    tx_entry->state == RXR_TX_QUEUED_RTS_RNR) {
 			tx_entry->state = RXR_TX_RTS;
+		} else if (tx_entry->state == RXR_TX_QUEUED_MEDIUM_MSG) {
+			tx_entry->state = RXR_TX_MEDIUM_MSG;
 		} else if (tx_entry->state == RXR_TX_QUEUED_READ_RESPONSE) {
 			tx_entry->state = RXR_TX_SENT_READ_RESPONSE;
 		} else if (tx_entry->state == RXR_TX_QUEUED_DATA_RNR) {
 			tx_entry->state = RXR_TX_SEND;
 			dlist_insert_tail(&tx_entry->entry,
 					  &ep->tx_pending_list);
-		}
-	}
+		} else if(tx_entry->state == RXR_TX_QUEUED_MEDIUM_MSG_RNR) {
+           		/*
+            		* We need to queue the tx_entry here
+            		* Because if it was a queued medium message before, there might be some data left to be sent
+            		*/
+           		tx_entry->state = RXR_TX_QUEUED_MEDIUM_MSG;
+           		dlist_insert_tail(&tx_entry->queued_entry,
+                            		  &ep->tx_entry_queued_list);
+       		}
+    }
 
 	/*
 	 * Send data packets until window or tx queue is exhausted.
@@ -2715,6 +2822,9 @@ int rxr_endpoint(struct fid_domain *domain, struct fi_info *info,
 	rxr_ep = calloc(1, sizeof(*rxr_ep));
 	if (!rxr_ep)
 		return -FI_ENOMEM;
+
+   	/* Initialize rx_entry_map */
+    	rxr_ep->rx_entry_map = NULL;
 
 	rxr_domain = container_of(domain, struct rxr_domain,
 				  util_domain.domain_fid);

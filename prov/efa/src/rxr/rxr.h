@@ -115,6 +115,12 @@ extern const uint32_t rxr_poison_value;
 #define RXR_MAX_NAME_LENGTH	(32)
 
 /*
+ * For medium size message reordering,
+ * wait for other medium rts packets with the same msg_id
+ */
+#define RXR_WAIT_MEDIUM_MSG_RTS (100)
+
+/*
  * RxR specific flags that are sent over the wire.
  */
 #define RXR_TAGGED		BIT_ULL(0)
@@ -139,6 +145,11 @@ extern const uint32_t rxr_poison_value;
 #define RXR_WRITE		(1 << 6)
 #define RXR_READ_REQ		(1 << 7)
 #define RXR_READ_DATA		(1 << 8)
+
+/*
+ * for medium size message
+ */
+#define RXR_MEDIUM_MSG_RTS		(1 << 9)
 
 /*
  * OFI flags
@@ -180,6 +191,7 @@ struct rxr_env {
 	int rx_copy_ooo;
 	int max_timeout;
 	int timeout_interval;
+	int medium_msg_limit; /* medium size message cutoff */
 };
 
 enum rxr_pkt_type {
@@ -228,6 +240,9 @@ enum rxr_tx_comm_type {
 				  * for rx_entry to finish receiving
 				  * (FI_READ only)
 				  */
+	RXR_TX_MEDIUM_MSG, /* tx_entry sending medium size message */
+	RXR_TX_QUEUED_MEDIUM_MSG, /* tx_entry was unable to send medium size message */
+    RXR_TX_QUEUED_MEDIUM_MSG_RNR /* tx_entry RNR sending medium data packets */
 };
 
 enum rxr_rx_comm_type {
@@ -435,6 +450,19 @@ struct rxr_domain {
 	enum fi_resource_mgmt resource_mgmt;
 };
 
+/* hashtable key structure for medium size messages */
+struct key_to_rx_entry {
+    uint32_t msg_id;
+    fi_addr_t addr;
+};
+
+/* hashtable entry for medium size messages */
+struct rxr_map_to_rx_entry {
+    struct key_to_rx_entry key;    /* key */
+    struct rxr_rx_entry *rx_entry;    /* value */
+    UT_hash_handle hh;    /* makes this structure hashable */
+};
+
 struct rxr_ep {
 	struct util_ep util_ep;
 
@@ -446,6 +474,9 @@ struct rxr_ep {
 
 	/* free stack for reorder buffer */
 	struct rxr_robuf_fs *robuf_fs;
+
+	/* hashtable for medium size messages */
+	struct rxr_map_to_rx_entry *rx_entry_map;
 
 	/* core provider fid */
 	struct fid_ep *rdm_ep;
@@ -503,6 +534,8 @@ struct rxr_ep {
 	struct ofi_bufpool *rx_entry_pool;
 	/* datastructure to maintain read response */
 	struct ofi_bufpool *readrsp_tx_entry_pool;
+	/* datastructure to maintain map_entry for medium size messages */
+    struct ofi_bufpool *map_entry_pool;
 
 	/* rx_entries with recv buf */
 	struct dlist_entry rx_list;
@@ -716,6 +749,7 @@ struct rxr_pkt_entry {
 	struct fid_mr *mr;
 	fi_addr_t addr;
 	void *pkt; /* rxr_ctrl_*_pkt, or rxr_data_pkt */
+	struct rxr_pkt_entry *next; /* link multiple rts packets for medium size messages */
 	enum rxr_pkt_entry_type type;
 	enum rxr_pkt_entry_state state;
 #if ENABLE_DEBUG
@@ -1010,8 +1044,35 @@ static inline uint64_t rxr_get_rts_data_size(struct rxr_ep *ep,
 		max_payload_size -= rts_hdr->rma_iov_count *
 					sizeof(struct fi_rma_iov);
 
+	if (rts_hdr->flags & RXR_MEDIUM_MSG_RTS)
+	    max_payload_size -= sizeof(uint32_t); /* medium data packets carry 4-byte offset */
+
 	return (rts_hdr->data_len > max_payload_size)
 		? max_payload_size : rts_hdr->data_len;
+}
+
+/* Compute medium message rts packet data size */
+static inline uint64_t rxr_get_medium_pkt_data_size(struct rxr_ep *ep,
+                                                    struct rxr_pkt_entry *pkt_entry)
+{
+    char *src;
+    uint32_t offset;
+    uint64_t data_len;
+    struct rxr_rts_hdr *rts_hdr;
+
+    rts_hdr = rxr_get_rts_hdr(pkt_entry->pkt);
+
+    if (rts_hdr->flags & RXR_REMOTE_CQ_DATA) {
+        src = rxr_get_ctrl_cq_pkt(rts_hdr)->data + rts_hdr->addrlen;
+    } else {
+        src = rxr_get_ctrl_pkt(rts_hdr)->data + rts_hdr->addrlen;
+    }
+
+    memcpy(&offset, src, sizeof(uint32_t));
+    data_len = MIN(rxr_get_rts_data_size(ep, rts_hdr),
+            rts_hdr->data_len - offset);
+
+    return data_len;
 }
 
 static inline size_t rxr_get_rx_pool_chunk_cnt(struct rxr_ep *ep)
@@ -1067,6 +1128,7 @@ int rxr_ep_post_buf(struct rxr_ep *ep, uint64_t flags);
 ssize_t rxr_ep_send_msg(struct rxr_ep *ep, struct rxr_pkt_entry *pkt_entry,
 			const struct fi_msg *msg, uint64_t flags);
 ssize_t rxr_ep_post_data(struct rxr_ep *rxr_ep, struct rxr_tx_entry *tx_entry);
+ssize_t rxr_ep_post_medium_msg(struct rxr_ep *rxr_ep, struct rxr_tx_entry *tx_entry);
 ssize_t rxr_ep_post_read_response(struct rxr_ep *rxr_ep, struct rxr_tx_entry *tx_entry);
 void rxr_ep_init_connack_pkt_entry(struct rxr_ep *ep,
 				   struct rxr_pkt_entry *pkt_entry,
@@ -1116,6 +1178,11 @@ void rxr_cq_write_tx_completion(struct rxr_ep *ep,
 void rxr_cq_recv_rts_data(struct rxr_ep *ep,
 			  struct rxr_rx_entry *rx_entry,
 			  struct rxr_rts_hdr *rts_hdr);
+
+int rxr_cq_recv_medium_data(struct rxr_ep *ep,
+              struct rxr_rx_entry *rx_entry,
+              struct rxr_pkt_entry *pkt_entry,
+              struct rxr_map_to_rx_entry *map_entry);
 
 void rxr_cq_handle_pkt_recv_completion(struct rxr_ep *ep,
 				       struct fi_cq_msg_entry *comp,
@@ -1272,6 +1339,14 @@ static inline int rxr_ep_post_cts_or_queue(struct rxr_ep *ep,
 		}
 	}
 	return ret;
+}
+
+static inline bool is_medium_size_message(struct rxr_ep *rxr_ep,
+                                          struct rxr_tx_entry *tx_entry)
+{
+    return (tx_entry->cq_entry.flags & FI_MSG)
+        && (tx_entry->total_len > rxr_ep->mtu_size)
+        && (tx_entry->total_len <= rxr_env.medium_msg_limit);
 }
 
 static inline bool rxr_peer_timeout_expired(struct rxr_ep *ep,
