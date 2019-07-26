@@ -1130,10 +1130,10 @@ static int rxr_cq_reorder_msg(struct rxr_ep *ep,
         } else {
             ofi_recvwin_queue_msg(peer->robuf, &ooo_entry, rts_hdr->msg_id);
         }
+    } else {
+        ofi_recvwin_queue_msg(peer->robuf, &ooo_entry, rts_hdr->msg_id);
     }
-
-    ofi_recvwin_queue_msg(peer->robuf, &ooo_entry, rts_hdr->msg_id);
-
+    
 	return 1;
 }
 
