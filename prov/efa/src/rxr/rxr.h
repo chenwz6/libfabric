@@ -868,6 +868,7 @@ rxr_get_pkt_entry(struct rxr_ep *ep, struct ofi_bufpool *pkt_pool)
 	memset(pkt_entry->pkt, 0, ep->mtu_size);
 #endif
 	pkt_entry->state = RXR_PKT_ENTRY_IN_USE;
+	pkt_entry->next = NULL;
 
 	return pkt_entry;
 }
