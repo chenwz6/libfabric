@@ -439,7 +439,7 @@ static int rxr_ep_handle_unexp_match(struct rxr_ep *ep,
 {
 	struct rxr_pkt_entry *pkt_entry;
 	struct rxr_rts_hdr *rts_hdr;
-        struct rxr_map_to_rx_entry key_entry, *map_entry;
+	struct rxr_map_to_rx_entry key_entry, *map_entry;
 	uint64_t bytes_left, len;
 	int ret = 0;
 
@@ -1727,17 +1727,17 @@ ssize_t rxr_tx(struct fid_ep *ep, const struct iovec *iov, size_t iov_count,
 	}
 
    	if (OFI_UNLIKELY(ret)) {
-        	if (ret == -FI_EAGAIN) {
+		if (ret == -FI_EAGAIN) {
 			tx_entry->state = is_medium_size_message(rxr_ep, tx_entry) ?
                     						RXR_TX_QUEUED_MEDIUM_MSG : RXR_TX_QUEUED_RTS;
-           		dlist_insert_tail(&tx_entry->queued_entry,
-                              	                     &rxr_ep->tx_entry_queued_list);
-           		ret = 0;
-       		} else {
-           		peer = rxr_ep_get_peer(rxr_ep, addr);
-           		peer->next_msg_id--;
-       		}
-   	}
+			dlist_insert_tail(&tx_entry->queued_entry,
+							&rxr_ep->tx_entry_queued_list);
+			ret = 0;
+		} else {
+			peer = rxr_ep_get_peer(rxr_ep, addr);
+			peer->next_msg_id--;
+		}
+	}
 
 out:
 	fastlock_release(&rxr_ep->util_ep.lock);
@@ -2530,8 +2530,8 @@ err_free_tx_pool:
 	if (ep->tx_pkt_pool)
 		ofi_bufpool_destroy(ep->tx_pkt_pool);
 err_free_map_entry_pool:
-   	if (ep->map_entry_pool)
-       		ofi_bufpool_destroy(ep->map_entry_pool);
+	if (ep->map_entry_pool)
+		ofi_bufpool_destroy(ep->map_entry_pool);
 err_out:
 	return ret;
 }
@@ -2754,8 +2754,8 @@ static void rxr_ep_progress_internal(struct rxr_ep *ep)
            		tx_entry->state = RXR_TX_QUEUED_MEDIUM_MSG;
            		dlist_insert_tail(&tx_entry->queued_entry,
 						&ep->tx_entry_queued_list);
-       		}
-    }
+		}
+	}
 
 	/*
 	 * Send data packets until window or tx queue is exhausted.

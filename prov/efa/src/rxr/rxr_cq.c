@@ -191,14 +191,14 @@ int rxr_cq_handle_tx_error(struct rxr_ep *ep, struct rxr_tx_entry *tx_entry,
 	case RXR_TX_RTS:
 		break;
 	case RXR_TX_MEDIUM_MSG:
-        break;
+		break;
 	case RXR_TX_SEND:
 		dlist_remove(&tx_entry->entry);
 		break;
 	case RXR_TX_QUEUED_RTS:
 	case RXR_TX_QUEUED_RTS_RNR:
 	case RXR_TX_QUEUED_DATA_RNR:
-        case RXR_TX_QUEUED_MEDIUM_MSG:
+	case RXR_TX_QUEUED_MEDIUM_MSG:
 	case RXR_TX_QUEUED_MEDIUM_MSG_RNR:
 		dlist_remove(&tx_entry->queued_entry);
 		break;
@@ -895,8 +895,8 @@ static int rxr_cq_process_rts(struct rxr_ep *ep,
 				}
 				bytes_left -= rxr_get_medium_pkt_data_size(ep, cur_unexp_rts_pkt_entry);
 				cur_unexp_rts_pkt_entry->next = pkt_entry;
-			if (bytes_left)
-				ret = RXR_WAIT_MEDIUM_MSG_RTS;
+				if (bytes_left)
+					ret = RXR_WAIT_MEDIUM_MSG_RTS;
 			}
 			return ret;
 		}
@@ -991,8 +991,8 @@ static int rxr_cq_process_rts(struct rxr_ep *ep,
 				bytes_left -= rxr_get_medium_pkt_data_size(ep, cur_unexp_rts_pkt_entry);
 				cur_unexp_rts_pkt_entry = cur_unexp_rts_pkt_entry->next;
 			}
-		if (bytes_left)
-			return RXR_WAIT_MEDIUM_MSG_RTS;
+			if (bytes_left)
+				return RXR_WAIT_MEDIUM_MSG_RTS;
 		}
 		return 0;
 	}
@@ -1255,9 +1255,8 @@ static void rxr_cq_handle_rts(struct rxr_ep *ep,
 
 	/* rxr_cq_process_rts will write error cq entry if needed */
 	ret = rxr_cq_process_rts(ep, pkt_entry);
-	if (ret == RXR_WAIT_MEDIUM_MSG_RTS || OFI_UNLIKELY(ret)){
+	if (ret == RXR_WAIT_MEDIUM_MSG_RTS || OFI_UNLIKELY(ret))
 		return;
-	}
 
 	/* process pending items in reorder buff */
 	if (rxr_need_sas_ordering(ep)) {
@@ -1527,9 +1526,9 @@ void rxr_cq_handle_pkt_send_completion(struct rxr_ep *ep, struct fi_cq_msg_entry
 
 			/* For medium message data packets */
 			if (rts_hdr->flags & RXR_MEDIUM_MSG_RTS)
-               			 tx_entry->bytes_acked += rxr_get_medium_pkt_data_size(ep, pkt_entry);
+				tx_entry->bytes_acked += rxr_get_medium_pkt_data_size(ep, pkt_entry);
 			else
-               			 tx_entry->bytes_acked += rxr_get_rts_data_size(ep, rts_hdr);
+				tx_entry->bytes_acked += rxr_get_rts_data_size(ep, rts_hdr);
 		}
 		break;
 	case RXR_CONNACK_PKT:

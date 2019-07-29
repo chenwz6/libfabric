@@ -1047,7 +1047,7 @@ static inline uint64_t rxr_get_rts_data_size(struct rxr_ep *ep,
 
 	/* medium data packets carry 4-byte offset */
 	if (rts_hdr->flags & RXR_MEDIUM_MSG_RTS)
-	    max_payload_size -= sizeof(uint32_t);
+		max_payload_size -= sizeof(uint32_t);
 
 	return (rts_hdr->data_len > max_payload_size)
 		? max_payload_size : rts_hdr->data_len;
