@@ -55,7 +55,7 @@ struct rxr_env rxr_env = {
 	.rx_copy_ooo = 1,
 	.max_timeout = RXR_DEF_RNR_MAX_TIMEOUT,
 	.timeout_interval = 0, /* 0 is random timeout */
-	.medium_msg_limit = 64000,
+	.medium_msg_limit = 65536,
 };
 
 static void rxr_init_env(void)
@@ -462,8 +462,8 @@ EFA_INI
 			"Set the maximum timeout (us) for backoff to a peer after a receiver not ready error. (Default: 1000000)");
 	fi_param_define(&rxr_prov, "timeout_interval", FI_PARAM_INT,
 			"Set the time interval (us) for the base timeout to use for exponential backoff to a peer after a receiver not ready error. (Default: 0 [random])");
-    fi_param_define(&rxr_prov, "medium_msg_limit", FI_PARAM_INT,
-            "Set the medium size threshold for messages. (Default: 64000)");
+	fi_param_define(&rxr_prov, "medium_msg_limit", FI_PARAM_INT,
+			"Set the medium size threshold for messages. (Default: 64000)");
 	rxr_init_env();
 
 	lower_efa_prov = init_lower_efa_prov();
